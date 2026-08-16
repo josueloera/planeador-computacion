@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planeaciones y Dosificación Cómputo SEP - PWA</title>
+    
+    <!-- Meta etiquetas para PWA e iOS -->
+    <meta name="theme-color" content="#1B4F72">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Cómputo SEP">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS for Excel generation -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- Custom Tailwind setup -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sepBlue: '#1B4F72',
+                        sepGreen: '#1E8449',
+                        sepPurple: '#7D3C98',
+                        sepAccent: '#2980B9'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.85; transform: scale(1.02); }
+        }
+        .pwa-pulse {
+            animation: pulseGlow 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-800 min-h-screen flex flex-col antialiased selection:bg-sepBlue selection:text-white">
+
+    <header class="bg-gradient-to-r from-slate-900 via-sepBlue to-slate-900 text-white shadow-xl sticky top-0 z-30 border-b border-blue-500/20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row items-center justify-between gap-4">
+            
+            <div class="flex items-center gap-3.5 w-full md:w-auto justify-between md:justify-start">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 bg-blue-500/20 rounded-xl border border-blue-400/30 text-blue-300 shadow-inner flex items-center justify-center">
+                        <i class="fa-solid fa-laptop-code text-2xl"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-lg sm:text-xl font-bold tracking-tight">Planeaciones Cómputo SEP</h1>
+                            <span id="pwaBadge" class="hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                                <i class="fa-solid fa-circle text-[6px]"></i> PWA Offline
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-300">Primaria • 38 Semanas • 1.º a 6.º Grado</p>
+                    </div>
+                </div>
+
+                <!-- Status Pill Mobile -->
+                <div id="statusIndicator" class="md:hidden text-[11px] px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 flex items-center gap-1.5">
+                    <i class="fa-solid fa-wifi text-emerald-400 text-[10px]" id="networkIcon"></i>
+                    <span id="networkText">Online</span>
+                </div>
+            </div>
+
+            <!-- Header Action Buttons -->
+            <div class="flex items-center gap-2.5 w-full md:w-auto justify-end flex-wrap sm:flex-nowrap">
+                
+                <!-- PWA Install Button -->
+                <button id="btnInstallPwa" onclick="instalarPWA()" class="hidden w-full sm:w-auto bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-bold px-4 py-2 rounded-xl shadow-lg transition-all duration-200 items-center justify-center gap-2 border border-yellow-300/40 text-xs pwa-pulse">
+                    <i class="fa-solid fa-download text-sm"></i>
+                    <span>Instalar App PWA</span>
+                </button>
+
+                <!-- Restore Default Data Button -->
+                <button onclick="restaurarValoresPorDefecto()" class="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-3 py-2 rounded-xl border border-slate-700 hover:border-slate-600 transition-all text-xs flex items-center justify-center gap-2" title="Restaurar datos originales de la SEP">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span>Restaurar Original</span>
+                </button>
+
+                <!-- Excel Export Button -->
+                <button id="btnExportExcel" onclick="exportarAExcel()" class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 border border-emerald-400/30 text-xs shrink-0">
+                    <i class="fa-solid fa-file-excel text-base"></i>
+                    <span>Descargar Excel (.xlsx)</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5">
+        
+        <!-- Controls & Filters Card -->
+        <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200/80 space-y-4">
+            
+            <!-- Tabs for Grades -->
+            <div class="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar border-b border-slate-100">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">Grado:</span>
+                <button onclick="cambiarGrado('1° Primaria')" id="tab-1" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 bg-sepBlue text-white shadow-sm">
+                    1.º Primaria (Fase 3)
+                </button>
+                <button onclick="cambiarGrado('2° Primaria')" id="tab-2" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all shrink-0 bg-slate-100 text-slate-600 hover:bg-slate-200">
+                    2.º Primaria (Fase 3)
+                </button>
+                <button onclick="cambiarGrado('3° Primaria')" id="tab-3" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all shrink-0 bg-slate-100 text-slate-600 hover:bg-slate-200">
+                    3.er Primaria (Fase 4)
+                </button>
+                <button onclick="cambiarGrado('4° Primaria')" id="tab-4" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all shrink-0 bg-slate-100 text-slate-600 hover:bg-slate-200">
+                    4.º Primaria (Fase 4)
+                </button>
+                <button onclick="cambiarGrado('5° Primaria')" id="tab-5" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all shrink-0 bg-slate-100 text-slate-600 hover:bg-slate-200">
+                    5.º Primaria (Fase 5)
+                </button>
+                <button onclick="cambiarGrado('6° Primaria')" id="tab-6" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all shrink-0 bg-slate-100 text-slate-600 hover:bg-slate-200">
+                    6.º Primaria (Fase 5)
+                </button>
+            </div>
+
+            <!-- Filters Row -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+                <!-- Search Box -->
+                <div class="relative w-full sm:w-80">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="searchInput" oninput="filtrarTabla()" placeholder="Buscar temas, palabras clave o software..." class="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sepBlue/30 focus:border-sepBlue transition-all">
+                </div>
+
+                <!-- Trimester Filter -->
+                <div class="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+                    <span class="text-xs font-semibold text-slate-500 shrink-0 mr-1">Trimestre:</span>
+                    <button onclick="filtrarTrimestre('Todos')" id="trim-Todos" class="trim-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-white shrink-0">Todos</button>
+                    <button onclick="filtrarTrimestre('1.er Trimestre')" id="trim-T1" class="trim-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 shrink-0">Trimestre 1</button>
+                    <button onclick="filtrarTrimestre('2.° Trimestre')" id="trim-T2" class="trim-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 shrink-0">Trimestre 2</button>
+                    <button onclick="filtrarTrimestre('3.er Trimestre')" id="trim-T3" class="trim-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 shrink-0">Trimestre 3</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="statsBanner" class="bg-gradient-to-r from-blue-900 via-sepBlue to-indigo-900 rounded-2xl p-4 text-white shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-white/10 rounded-xl backdrop-blur-sm text-yellow-400">
+                    <i class="fa-solid fa-graduation-cap text-2xl"></i>
+                </div>
+                <div>
+                    <h2 id="gradoTitle" class="font-bold text-base sm:text-lg">1.º de Primaria — Fase 3</h2>
+                    <p id="gradoSubtitle" class="text-xs text-blue-200">Iniciación al Aula de Cómputo, Psicomotricidad y Teclado Inicial</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 text-center text-xs w-full sm:w-auto justify-around sm:justify-end">
+                <div class="bg-white/10 px-3.5 py-1.5 rounded-xl backdrop-blur-sm">
+                    <span class="block font-bold text-sm text-yellow-300" id="statSemanas">38</span>
+                    <span class="text-blue-200 text-[10px]">Semanas</span>
+                </div>
+                <div class="bg-white/10 px-3.5 py-1.5 rounded-xl backdrop-blur-sm">
+                    <span class="block font-bold text-sm text-emerald-300" id="statTrimestres">3</span>
+                    <span class="text-blue-200 text-[10px]">Trimestres</span>
+                </div>
+                <div class="bg-white/10 px-3.5 py-1.5 rounded-xl backdrop-blur-sm">
+                    <span class="block font-bold text-sm text-cyan-300" id="statUnidades">21</span>
+                    <span class="text-blue-200 text-[10px]">Temas</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table Container -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+            <div class="overflow-x-auto custom-scrollbar">
+                <table class="w-full text-left border-collapse min-w-[1000px]">
+                    <thead>
+                        <tr class="bg-slate-100/90 text-slate-700 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200">
+                            <th class="py-3 px-4 w-28 text-center">Semana</th>
+                            <th class="py-3 px-4 w-28">Trimestre</th>
+                            <th class="py-3 px-4 w-56">Tema / Contenido</th>
+                            <th class="py-3 px-4 w-60">Propósito / PDA</th>
+                            <th class="py-3 px-4 w-52">Secuencia Didáctica</th>
+                            <th class="py-3 px-4 w-40">Materiales / Software</th>
+                            <th class="py-3 px-4 w-44">Evaluación & Producto</th>
+                            <th class="py-3 px-4 w-32 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaCuerpo" class="divide-y divide-slate-100 text-xs text-slate-700">
+                        <!-- Dynamic content filled by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal for Viewing Full Week Details (Read-Only) -->
+    <div id="modalVerDetalle" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <!-- Modal Header -->
+            <div class="p-4 sm:p-5 bg-gradient-to-r from-slate-900 via-sepBlue to-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-2 bg-indigo-500/20 text-indigo-300 rounded-lg border border-indigo-400/30">
+                        <i class="fa-solid fa-eye text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span id="viewSemanaBadge" class="inline-block px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500 text-white uppercase tracking-wider">Semana 1</span>
+                            <span id="viewTrimestreBadge" class="inline-block px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500 text-white uppercase tracking-wider">1.er Trimestre</span>
+                        </div>
+                        <h3 id="viewGradoTitle" class="text-sm sm:text-base font-bold text-slate-100 mt-0.5">1.° Primaria — Fase 3</h3>
+                    </div>
+                </div>
+                <button onclick="cerrarModalVer()" class="text-slate-400 hover:text-white p-2 rounded-lg text-lg transition-colors">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Body (Read Only) -->
+            <div class="p-5 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-grow text-xs leading-relaxed bg-slate-50/50">
+                <!-- Tema Main Card -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Tema / Contenido Curricular:</span>
+                    <h2 id="viewTema" class="text-base sm:text-lg font-bold text-slate-900 leading-snug"></h2>
+                    <div class="mt-2 flex items-center gap-2 text-slate-500 font-medium text-[11px]">
+                        <i class="fa-regular fa-clock text-indigo-500"></i>
+                        <span>Duración estimada: <strong id="viewDuracion" class="text-slate-800">1 Semana</strong></span>
+                    </div>
+                </div>
+
+                <!-- PDA Card -->
+                <div class="bg-blue-50/70 p-4 rounded-xl border border-blue-100/80">
+                    <span class="text-[10px] font-bold text-blue-700 uppercase tracking-wider block mb-1">
+                        <i class="fa-solid fa-bullseye text-blue-600 mr-1"></i>Propósito / PDA (Proceso de Desarrollo de Aprendizaje):
+                    </span>
+                    <p id="viewPDA" class="text-xs text-slate-800 font-medium leading-relaxed"></p>
+                </div>
+
+                <!-- Secuencia Didáctica Timeline / 3 Cards -->
+                <div>
+                    <h4 class="font-bold text-slate-700 mb-2 flex items-center gap-1.5 text-xs">
+                        <i class="fa-solid fa-list-check text-sepBlue"></i> Secuencia Didáctica Semanal
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div class="bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-100 space-y-1">
+                            <span class="font-bold text-emerald-900 text-xs block"><i class="fa-solid fa-play text-emerald-600 mr-1.5"></i>Inicio (10 min):</span>
+                            <p id="viewInicio" class="text-slate-700 text-xs leading-relaxed"></p>
+                        </div>
+                        <div class="bg-amber-50/80 p-3.5 rounded-xl border border-amber-100 space-y-1">
+                            <span class="font-bold text-amber-900 text-xs block"><i class="fa-solid fa-gears text-amber-600 mr-1.5"></i>Desarrollo (35 min):</span>
+                            <p id="viewDesarrollo" class="text-slate-700 text-xs leading-relaxed"></p>
+                        </div>
+                        <div class="bg-purple-50/80 p-3.5 rounded-xl border border-purple-100 space-y-1">
+                            <span class="font-bold text-purple-900 text-xs block"><i class="fa-solid fa-flag-checkered text-purple-600 mr-1.5"></i>Cierre (10 min):</span>
+                            <p id="viewCierre" class="text-slate-700 text-xs leading-relaxed"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Materiales, Evaluacion, Producto -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <div class="bg-white p-3.5 rounded-xl border border-slate-200">
+                        <span class="font-bold text-slate-800 block mb-1 text-[11px]"><i class="fa-solid fa-toolbox text-slate-500 mr-1"></i>Materiales / Software:</span>
+                        <p id="viewMateriales" class="text-slate-600 text-xs"></p>
+                    </div>
+                    <div class="bg-white p-3.5 rounded-xl border border-slate-200">
+                        <span class="font-bold text-slate-800 block mb-1 text-[11px]"><i class="fa-solid fa-clipboard-check text-slate-500 mr-1"></i>Evaluación / Criterio:</span>
+                        <p id="viewEvaluacion" class="text-slate-600 text-xs"></p>
+                    </div>
+                    <div class="bg-white p-3.5 rounded-xl border border-slate-200">
+                        <span class="font-bold text-slate-800 block mb-1 text-[11px]"><i class="fa-solid fa-box-archive text-slate-500 mr-1"></i>Producto Entregable:</span>
+                        <p id="viewProducto" class="text-slate-800 font-semibold text-xs"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between">
+                <button onclick="cerrarModalVer()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs rounded-xl transition-colors">
+                    Cerrar
+                </button>
+                <button id="btnSwitchToEdit" class="px-4 py-2 bg-sepBlue hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    <span>Editar esta Semana</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for editing full week details -->
+    <div id="modalDetalle" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <!-- Modal Header -->
+            <div class="p-4 sm:p-5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-2 bg-blue-500/20 text-blue-400 rounded-lg">
+                        <i class="fa-solid fa-pen-to-square text-lg"></i>
+                    </div>
+                    <div>
+                        <span id="modalSemanaBadge" class="inline-block px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-blue-500 text-white uppercase tracking-wider mb-0.5">Edición de Semana</span>
+                        <h3 class="text-sm sm:text-base font-bold text-slate-100">Editar Planeación Semanal</h3>
+                    </div>
+                </div>
+                <button onclick="cerrarModal()" class="text-slate-400 hover:text-white p-2 rounded-lg text-lg transition-colors">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Body (Form Fields) -->
+            <div class="p-5 sm:p-6 space-y-4 overflow-y-auto custom-scrollbar flex-grow text-xs leading-relaxed bg-slate-50/50">
+                
+                <!-- Metadata Row -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="font-bold text-slate-700 block mb-1">Semana / Clave:</label>
+                        <input type="text" id="editSemana" class="w-full p-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-sepBlue focus:border-sepBlue outline-none text-xs font-semibold text-slate-800">
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-700 block mb-1">Duración:</label>
+                        <input type="text" id="editDuracion" class="w-full p-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-sepBlue focus:border-sepBlue outline-none text-xs text-slate-800">
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-700 block mb-1">Trimestre:</label>
+                        <select id="editTrimestre" class="w-full p-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-sepBlue focus:border-sepBlue outline-none text-xs font-semibold text-slate-800">
+                            <option value="1.er Trimestre">1.er Trimestre</option>
+                            <option value="2.° Trimestre">2.° Trimestre</option>
+                            <option value="3.er Trimestre">3.er Trimestre</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Tema Title -->
+                <div>
+                    <label class="font-bold text-slate-700 block mb-1"><i class="fa-solid fa-heading text-sepBlue mr-1"></i>Tema / Contenido Curricular:</label>
+                    <input type="text" id="editTema" class="w-full p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-sepBlue focus:border-sepBlue outline-none text-xs font-bold text-slate-900">
+                </div>
+
+                <!-- PDA -->
+                <div class="bg-blue-50/60 p-3 rounded-xl border border-blue-100">
+                    <label class="font-bold text-blue-900 block mb-1"><i class="fa-solid fa-bullseye text-blue-700 mr-1.5"></i>Propósito / PDA (Proceso de Desarrollo):</label>
+                    <textarea id="editPDA" rows="2" class="w-full p-2 bg-white border border-blue-200 rounded-xl focus:ring-2 focus:ring-sepBlue outline-none text-xs text-slate-800 leading-relaxed custom-scrollbar"></textarea>
+                </div>
+
+                <!-- Secuencia Didáctica (Inicio, Desarrollo, Cierre) -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="bg-emerald-50/70 p-3 rounded-xl border border-emerald-100 space-y-1">
+                        <label class="font-bold text-emerald-900 block"><i class="fa-solid fa-play text-xs mr-1 text-emerald-700"></i>Inicio (10 min):</label>
+                        <textarea id="editInicio" rows="3" class="w-full p-2 bg-white border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs text-slate-800 leading-relaxed custom-scrollbar"></textarea>
+                    </div>
+                    <div class="bg-amber-50/70 p-3 rounded-xl border border-amber-100 space-y-1">
+                        <label class="font-bold text-amber-900 block"><i class="fa-solid fa-gears text-xs mr-1 text-amber-700"></i>Desarrollo (35 min):</label>
+                        <textarea id="editDesarrollo" rows="3" class="w-full p-2 bg-white border border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none text-xs text-slate-800 leading-relaxed custom-scrollbar"></textarea>
+                    </div>
+                    <div class="bg-purple-50/70 p-3 rounded-xl border border-purple-100 space-y-1">
+                        <label class="font-bold text-purple-900 block"><i class="fa-solid fa-flag-checkered text-xs mr-1 text-purple-700"></i>Cierre (10 min):</label>
+                        <textarea id="editCierre" rows="3" class="w-full p-2 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-xs text-slate-800 leading-relaxed custom-scrollbar"></textarea>
+                    </div>
+                </div>
+
+                <!-- Materiales, Evaluacion, Producto -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="font-bold text-slate-700 block mb-1"><i class="fa-solid fa-toolbox text-slate-500 mr-1"></i>Materiales / Software:</label>
+                        <textarea id="editMateriales" rows="2" class="w-full p-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-sepBlue outline-none text-xs text-slate-800 custom-scrollbar"></textarea>
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-700 block mb-1"><i class="fa-solid fa-clipboard-check text-slate-500 mr-1"></i>Criterio / Evaluación:</label>
+                        <textarea id="editEvaluacion" rows="2" class="w-full p-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-sepBlue outline-none text-xs text-slate-800 custom-scrollbar"></textarea>
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-700 block mb-1"><i class="fa-solid fa-box-archive text-slate-500 mr-1"></i>Producto Entregable:</label>
+                        <textarea id="editProducto" rows="2" class="w-full p-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-sepBlue outline-none text-xs text-slate-800 custom-scrollbar"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between">
+                <span class="text-[11px] text-slate-500 italic"><i class="fa-solid fa-floppy-disk mr-1"></i>Guardado automático en la App Offline.</span>
+                <div class="flex items-center gap-2">
+                    <button onclick="cerrarModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium text-xs rounded-xl transition-colors">
+                        Cancelar
+                    </button>
+                    <button onclick="guardarCambiosSemana()" class="px-5 py-2 bg-sepBlue hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2">
+                        <i class="fa-solid fa-check"></i>
+                        <span>Guardar Cambios</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toastNotification" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 text-xs flex items-center gap-2.5 z-50 transform translate-y-20 opacity-0 transition-all duration-300">
+        <i class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toastMessage">¡Cambios guardados con éxito!</span>
+    </div>
+
+    <script>
+        // Database containing 38 weeks for all 6 grades
+        const baseDeDatos = {
+            "1° Primaria": {
+                fase: "Fase 3",
+                subtitulo: "Iniciación al Aula de Cómputo, Psicomotricidad y Teclado Inicial",
+                semanas: [
+                    { sem: "Semana 1", trim: "1.er Trimestre", dur: "1 Semana", tema: "Bienvenida y Reglamento del Aula", pda: "Reconoce el laboratorio de cómputo, las normas de convivencia y el cuidado del equipo.", inicio: "¿Qué reglas debemos seguir para no dañar los equipos ni lastimarnos?", desarrollo: "Recorrido por el aula, ubicación de lugares y demostración de posturas correctas.", cierre: "Dinámica de preguntas rápidas sobre conductas seguras en el aula.", mat: "Reglamento ilustrado, proyector.", eval: "Lista de cotejo: Identifica 3 reglas básicas.", prod: "Dibujo de las reglas del aula." },
+                    { sem: "Semana 2-3", trim: "1.er Trimestre", dur: "Quincena", tema: "¿Qué es una Computadora? Tipos y Usos", pda: "Identifica qué es una computadora y diferencia entre escritorio, laptop y tablet.", inicio: "Muestra de imágenes: ¿Cuáles de estos aparatos son computadoras?", desarrollo: "Clasificación guiada de dispositivos digitales. Práctica en parejas.", cierre: "Puesta en común sobre el uso de la computadora en casa y trabajo.", mat: "Tarjetas recortables de dispositivos.", eval: "Registro de clasificación de equipos.", prod: "Collage de tipos de computadoras." },
+                    { sem: "Semana 4-5", trim: "1.er Trimestre", dur: "Quincena", tema: "Encendido, Apagado y Ergonomía", pda: "Aprende la secuencia de encendido y apagado adoptando postura ergonómica.", inicio: "¿Qué pasa si desenchufamos la computadora directamente de la pared?", desarrollo: "Práctica guiada del botón Power y apagado por menú de sistema operativo.", cierre: "Revisión de la postura correcta en la silla frente al monitor.", mat: "Computadoras de escritorio.", eval: "Lista de cotejo de apague correcto.", prod: "Demostración de encendido/apagado." },
+                    { sem: "Semana 6-7", trim: "1.er Trimestre", dur: "Quincena", tema: "Partes Principales: CPU y Monitor", pda: "Distingue la función del gabinete (cerebro) y la pantalla (monitor).", inicio: "Adivinanza: ¿Dónde vemos los dibujos y dónde se procesan las tareas?", desarrollo: "Señalamiento físico de botones y puertos frontales del gabinete.", cierre: "Colorear y rotular una lámina interactiva con el CPU y Monitor.", mat: "Láminas ilustrativas, computadoras.", eval: "Escala valorativa de periféricos.", prod: "Ficha técnica rotulada CPU/Monitor." },
+                    { sem: "Semana 8-9", trim: "1.er Trimestre", dur: "Quincena", tema: "Audio: Bocinas y Audífonos", pda: "Identifica periféricos de salida de audio y regula el volumen de forma segura.", inicio: "Escuchar sonidos en la computadora: ¿Por dónde sale el sonido?", desarrollo: "Conexión supervisada de audífonos y ajuste del volumen en la barra de tareas.", cierre: "Reflexión sobre el cuidado del oído al usar audífonos.", mat: "Audífonos escolares, videos.", eval: "Lista de verificación de nivel de volumen.", prod: "Ejercicio auditivo interactivo." },
+                    { sem: "Semana 10-11", trim: "1.er Trimestre", dur: "Quincena", tema: "El Ratón (Mouse): Agarre y Cursor", pda: "Desarrolla coordinación ojo-mano mediante el agarre del ratón.", inicio: "Presentación del ratón como la 'mano digital' en pantalla.", desarrollo: "Ejercicios de seguimiento del puntero y persecución de burbujas en pantalla.", cierre: "Comentar qué movimiento costó más trabajo al usar la mano.", mat: "Software de ratón (GCompris/Tux Paint).", eval: "Rúbrica de control motriz.", prod: "Juego de persecución completado." },
+                    { sem: "Semana 12-13", trim: "1.er Trimestre", dur: "Quincena", tema: "Proyecto Trimestral: Mi Estación de Trabajo", pda: "Demuestra dominio de partes básicas y normas de uso del laboratorio.", inicio: "Preguntas de repaso de partes de la computadora en el proyector.", desarrollo: "Circuito práctico individual de encendido, uso de ratón y apagado.", cierre: "Exhibición de láminas y maquetas elaboradas en el trimestre.", mat: "Hojas de trabajo, computadoras.", eval: "Rúbrica sumativa del Trimestre 1.", prod: "Lámina/Maqueta evaluada." },
+                    { sem: "Semana 14", trim: "2.° Trimestre", dur: "1 Semana", tema: "El Clic Izquierdo y Selección", pda: "Aprende a apuntar y dar un solo clic para seleccionar íconos.", inicio: "¿Qué cambia de color al dar un solo clic en un ícono del escritorio?", desarrollo: "Práctica de selección de objetos en el escritorio y juegos educativos.", cierre: "Juego 'Simón dice' seleccionando objetos específicos en pantalla.", mat: "Juegos educativos para PC.", eval: "Lista de cotejo de precisión de clic.", prod: "Captura de aciertos en juego." },
+                    { sem: "Semana 15", trim: "2.° Trimestre", dur: "1 Semana", tema: "El Doble Clic para Abrir Programas", pda: "Ejecuta el doble clic rápido y continuo para abrir programas.", inicio: "Demostración del ritmo del doble clic (!toc-toc!).", desarrollo: "Práctica de apertura y cierre de Paint y carpetas de prueba.", cierre: "Reflexión: ¿Por qué no abre si tardamos mucho entre clics?", mat: "Programa de dibujo Paint.", eval: "Registro de autonomía en apertura.", prod: "Apertura autónoma de Paint." },
+                    { sem: "Semana 16-17", trim: "2.° Trimestre", dur: "Quincena", tema: "Arrastrar y Soltar (Drag & Drop)", pda: "Domina la técnica de clic sostenido para mover objetos digitales.", inicio: "Analogía: Agarrar un juguete, moverlo y soltarlo en la mesa.", desarrollo: "Resolución de rompecabezas digitales arrastrando piezas en pantalla.", cierre: "Verificación de piezas colocadas correctamente.", mat: "Juegos de rompecabezas PC.", eval: "Lista de cotejo de motricidad fina.", prod: "Rompecabezas digital armado." },
+                    { sem: "Semana 18-19", trim: "2.° Trimestre", dur: "Quincena", tema: "Paint: Lápiz y Pinceles", pda: "Explora trazos libres, grosores y colores en el lienzo digital.", inicio: "Presentación de la paleta de colores y tipos de pinceles en Paint.", desarrollo: "Trazado de líneas rectas, curvas y figuras libres con colores variados.", cierre: "Muestra en pantalla de los trazos más creativos del grupo.", mat: "MS Paint / Tux Paint.", eval: "Rúbrica de uso de herramientas.", prod: "Lienzo digital con trazos variados." },
+                    { sem: "Semana 20-21", trim: "2.° Trimestre", dur: "Quincena", tema: "Formas Geométricas y Bote de Pintura", pda: "Dibuja figuras geométricas cerradas y aplica relleno de color.", inicio: "¿Cómo evitar que la pintura se derrame por toda la pantalla?", desarrollo: "Dibujo de un robot o casa combinando formas y bote de pintura.", cierre: "Uso del botón Deshacer (Ctrl+Z) para corregir derrames.", mat: "MS Paint.", eval: "Lista de cotejo: Formas cerradas.", prod: "Archivo Casa_Geométrica.png." },
+                    { sem: "Semana 22-23", trim: "2.° Trimestre", dur: "Quincena", tema: "El Borrador y Modificación de Tamaños", pda: "Aprende a borrar partes específicas ajustando el tamaño de la goma.", inicio: "Demostración de cómo agrandar y reducir la goma de borrar.", desarrollo: "Plantilla de dibujo con trazos para 'limpiar' sin borrar las líneas guía.", cierre: "Revisión de la precisión al borrar bordes.", mat: "MS Paint.", eval: "Registro de precisión de borrado.", prod: "Plantilla limpia y corregida." },
+                    { sem: "Semana 24-25", trim: "2.° Trimestre", dur: "Quincena", tema: "Proyecto Trimestral: Paisaje Natural y Guardado", pda: "Integra herramientas de dibujo y aprende la ruta básica de guardado.", inicio: "Presentación del proyecto: Dibujar su paisaje o animal favorito.", desarrollo: "Elaboración del dibujo, aplicación de color y guardado asistido.", cierre: "Exposición colectiva proyectando los dibujos guardados.", mat: "Paint, carpeta del grupo.", eval: "Rúbrica de dibujo y guardado.", prod: "Archivo Paisaje_Nombre.png." },
+                    { sem: "Semana 26", trim: "3.er Trimestre", dur: "1 Semana", tema: "El Teclado: Estructura y Zonas", pda: "Reconoce la distribución del teclado: letras, números y teclas guía.", inicio: "¿Dónde están las letras y dónde los números en el teclado?", desarrollo: "Identificación de la fila guía (ASDF - JKLÑ) y teclado numérico.", cierre: "Dinámica: Encontrar letras específicas lo más rápido posible.", mat: "Teclados físicos, láminas.", eval: "Lista de cotejo de bloques de teclado.", prod: "Plantilla de teclado coloreada." },
+                    { sem: "Semana 27-28", trim: "3.er Trimestre", dur: "Quincena", tema: "Las Vocales y Números en el Teclado", pda: "Localiza y presiona vocales y números usando ambas manos.", inicio: "Juego de las vocales en el teclado.", desarrollo: "Captura de series numéricas del 1 al 10 y vocales en Bloc de Notas.", cierre: "Revisión en pantalla de la escritura correcta.", mat: "Bloc de Notas / Mecanet.", eval: "Lista de verificación de digitación.", prod: "Texto con vocales y series." },
+                    { sem: "Semana 29-30", trim: "3.er Trimestre", dur: "Quincena", tema: "Teclas Especiales: Espacio, Enter y Borrar", pda: "Aplica Espacio, Enter y Backspace para estructurar textos simples.", inicio: "¿Cómo separamos las palabras para que no queden pegadas?", desarrollo: "Escritura del nombre completo, escuela y lista de 3 frutas en renglones.", cierre: "Uso de la tecla Retroceso para corregir errores.", mat: "Bloc de Notas / WordPad.", eval: "Rúbrica de teclas especiales.", prod: "Documento con lista estructurada." },
+                    { sem: "Semana 31-32", trim: "3.er Trimestre", dur: "Quincena", tema: "Pensamiento Lógico: Secuencias Desconectadas", pda: "Comprende secuencias de pasos lógicos usando flechas de dirección.", inicio: "Juego en el piso: Guiar a un compañero con órdenes de dirección.", desarrollo: "Trazar en cuadrículas de papel la ruta para que un animalito llegue a su comida.", cierre: "Comprobación de rutas correctas.", mat: "Cuadrículas impresas, flechas.", eval: "Lista de cotejo de secuencias.", prod: "Cuadrícula con ruta lógica." },
+                    { sem: "Semana 33-34", trim: "3.er Trimestre", dur: "Quincena", tema: "Lógica Digital en Bloques (Code.org Pre-lector)", pda: "Resuelve laberintos digitales arrastrando bloques de movimiento.", inicio: "Demostración del entorno de laberinto en Code.org.", desarrollo: "Resolución autónoma de los niveles 1 al 6 de secuencias de movimiento.", cierre: "Celebración de niveles superados y análisis de errores.", mat: "Code.org (Curso A).", eval: "Registro de avance en plataforma.", prod: "6 niveles superados en Code.org." },
+                    { sem: "Semana 35-36", trim: "3.er Trimestre", dur: "Quincena", tema: "Proyecto Final: Mi Mensaje Ilustrado", pda: "Combina dibujo y texto escrito para comunicar un mensaje corto.", inicio: "Presentación del reto: Crear una postal con dibujo y oración.", desarrollo: "Diseño del dibujo en Paint e inserción en documento con su mensaje.", cierre: "Impresión o proyección de las postales ante el grupo.", mat: "Paint, WordPad, impresora.", eval: "Rúbrica de proyecto final 1.º.", prod: "Postal ilustrada digital/impresa." },
+                    { sem: "Semana 37-38", trim: "3.er Trimestre", dur: "Quincena", tema: "Muestra Tecnológica y Cierre de Grado", pda: "Demuestra los aprendizajes adquiridos a lo largo del ciclo escolar.", inicio: "Recorrido por los trabajos guardados en su carpeta del año.", desarrollo: "Feria de demostración: los alumnos muestran sus dibujos y textos.", cierre: "Entrega de reconocimientos de habilidades digitales.", mat: "Portafolios digitales.", eval: "Evaluación global formativa.", prod: "Portafolio digital revisado." }
+                ]
+            },
+            "2° Primaria": {
+                fase: "Fase 3",
+                subtitulo: "Sistema Operativo, Procesador de Textos Inicial y Bloques B",
+                semanas: [
+                    { sem: "Semana 1", trim: "1.er Trimestre", dur: "1 Semana", tema: "Diagnóstico y Convivencia Digital", pda: "Evalúa habilidades de entrada y refuerza el reglamento del aula.", inicio: "¿Qué actividades con computadora recuerdan del año pasado?", desarrollo: "Práctica diagnóstica breve en software de dibujo y teclado.", cierre: "Registro de acuerdos de convivencia para el ciclo escolar.", mat: "Fichas de registro, PC.", eval: "Lista de cotejo diagnóstico.", prod: "Ficha diagnóstica completada." },
+                    { sem: "Semana 2-3", trim: "1.er Trimestre", dur: "Quincena", tema: "El Escritorio y la Barra de Tareas", pda: "Explora íconos del escritorio, barra de tareas y menú de inicio.", inicio: "¿Dónde están guardados los programas al encender la PC?", desarrollo: "Localización y anclaje de accesos directos; cambio de fondo de pantalla.", cierre: "Preguntas de repaso sobre cómo abrir programas rápidamente.", mat: "Sistema Operativo (Windows/Linux).", eval: "Lista de cotejo de navegación.", prod: "Escritorio organizado." },
+                    { sem: "Semana 4-5", trim: "1.er Trimestre", dur: "Quincena", tema: "Control y Manipulación de Ventanas", pda: "Domina botones de Minimizar, Maximizar, Restaurar y Cerrar.", inicio: "¿Cómo tener dos programas abiertos al mismo tiempo?", desarrollo: "Práctica de redimensionar, mover y alternar entre ventanas abiertas.", cierre: "Juego de rapidez minimizando y restaurando ventanas.", mat: "Sistema Operativo.", eval: "Rúbrica de manipulación de ventanas.", prod: "Demostración de 2 ventanas activas." },
+                    { sem: "Semana 6-7", trim: "1.er Trimestre", dur: "Quincena", tema: "Concepto de Archivos y Carpetas", pda: "Comprende la estructura de carpetas para organizar trabajos.", inicio: "Analogía: La mochila escolar y las libretas de materias.", desarrollo: "Creación de una carpeta con su nombre y subcarpetas (Dibujos, Textos).", cierre: "Verificación de la estructura en el Explorador de Archivos.", mat: "Explorador de archivos.", eval: "Lista de cotejo: Carpetas creadas.", prod: "Estructura de carpetas personal." },
+                    { sem: "Semana 8-9", trim: "1.er Trimestre", dur: "Quincena", tema: "Unidades de Almacenamiento (USB)", pda: "Reconoce memorias USB y la importancia de la expulsión segura.", inicio: "¿Cómo llevamos un trabajo de la escuela a la casa?", desarrollo: "Conexión de USB, localización en 'Este Equipo' y proceso de expulsión.", cierre: "Reflexión: ¿Por qué no desconectar la USB mientras guarda?", mat: "Memorias USB de prueba.", eval: "Lista de verificación de expulsión.", prod: "Práctica de guardado en USB." },
+                    { sem: "Semana 10-11", trim: "1.er Trimestre", dur: "Quincena", tema: "Guardar y Abrir en Rutas Específicas", pda: "Guarda archivos en su carpeta personal y aprende a reabrirlos.", inicio: "Ruta: Archivo > Guardar como > Examinar > Mi Carpeta.", desarrollo: "Crear dibujo en Paint, guardarlo en su carpeta y volver a abrirlo.", cierre: "Comprobación de que no quedó guardado en lugares incorrectos.", mat: "Paint, Explorador de archivos.", eval: "Rúbrica de guardado en ruta.", prod: "Archivo guardado y recuperado." },
+                    { sem: "Semana 12-13", trim: "1.er Trimestre", dur: "Quincena", tema: "Evaluación Trimestral: Gestión de Archivos", pda: "Demuestra autonomía en organización de archivos y carpetas.", inicio: "Planteamiento del reto práctico trimestral.", desarrollo: "Circuito: Crear carpeta, dibujar en Paint, guardar y cerrar todo.", cierre: "Retroalimentación individual sobre orden digital.", mat: "Sistema Operativo.", eval: "Rúbrica sumativa Trimestre 1.", prod: "Carpeta personal evaluada." },
+                    { sem: "Semana 14", trim: "2.° Trimestre", dur: "1 Semana", tema: "Entorno del Procesador de Textos", pda: "Identifica la hoja de trabajo, cursor y cinta de opciones.", inicio: "Comparar Bloc de Notas con Word: ¿Qué herramientas nuevas hay?", desarrollo: "Exploración de la interfaz; escritura de un saludo y cambio de zoom.", cierre: "Diferenciar cursor de texto vs puntero del ratón.", mat: "MS Word / WordPad.", eval: "Lista de cotejo de interfaz.", prod: "Documento con saludo inicial." },
+                    { sem: "Semana 15", trim: "2.° Trimestre", dur: "1 Semana", tema: "Mayúsculas y Minúsculas (Shift)", pda: "Aplica Bloq Mayús y Shift para escribir nombres propios.", inicio: "¿Cuándo se usan las mayúsculas en Español?", desarrollo: "Escritura de lista de 5 nombres propios y países usando Shift.", cierre: "Corrección en parejas de nombres propios con mayúscula.", mat: "Procesador de textos.", eval: "Lista de verificación ortográfica.", prod: "Lista de 10 nombres corregidos." },
+                    { sem: "Semana 16-17", trim: "2.° Trimestre", dur: "Quincena", tema: "Tipografía: Fuente, Tamaño y Color", pda: "Selecciona texto con el ratón y aplica fuentes, tamaños y colores.", inicio: "Selección de texto con doble clic y arrastre del ratón.", desarrollo: "Transcripción de una adivinanza; aplicar 3 fuentes y colores distintos.", cierre: "Reflexión sobre fuentes legibles vs difíciles de leer.", mat: "Procesador de textos.", eval: "Rúbrica de formato tipográfico.", prod: "Documento Adivinanza.docx." },
+                    { sem: "Semana 18-19", trim: "2.° Trimestre", dur: "Quincena", tema: "Estilos: Negrita, Cursiva y Subrayado", pda: "Utiliza estilos de fuente para resaltar títulos e ideas principales.", inicio: "Mostrar cuento sin estilos vs cuento con título en negrita.", desarrollo: "Formatear un poema aplicando Negrita (Ctrl+N) y Subrayado (Ctrl+S).", cierre: "Revisión de atajos de teclado para estilos rápidos.", mat: "Procesador de textos.", eval: "Lista de cotejo de estilos.", prod: "Poema formateado con estilos." },
+                    { sem: "Semana 20-21", trim: "2.° Trimestre", dur: "Quincena", tema: "Signos de Puntuación Básicos", pda: "Digita punto, coma y signos de interrogación/admiración.", inicio: "Localizar en el teclado los signos `¿?` y `¡!` combinando Shift.", desarrollo: "Redacción de 4 preguntas para una entrevista usando signos.", cierre: "Lectura en voz alta respetando la entonación de los signos.", mat: "Procesador de textos.", eval: "Rúbrica de puntuación digital.", prod: "Entrevista con signos correcta." },
+                    { sem: "Semana 22-23", trim: "2.° Trimestre", dur: "Quincena", tema: "Alineación de Texto", pda: "Aplica alineación izquierda, centro y derecha en párrafos.", inicio: "¿Cómo centrar un título sin presionar espacio muchas veces?", desarrollo: "Estructurar fábula: Título centrado, texto a la izquierda, autor a la derecha.", cierre: "Comparación de documentos alineados vs desordenados.", mat: "Procesador de textos.", eval: "Lista de verificación de alineación.", prod: "Fábula alineada correctamente." },
+                    { sem: "Semana 24-25", trim: "2.° Trimestre", dur: "Quincena", tema: "Proyecto Trimestral: Mi Mini Cuento Digital", pda: "Integra herramientas de formato de texto en un cuento propio.", inicio: "Lluvia de ideas de temas para el cuento (valores, animales).", desarrollo: "Redacción de cuento de 6 renglones con títulos, colores y signos.", cierre: "Lectura de cuentos proyectados en la pantalla.", mat: "Procesador de textos.", eval: "Rúbrica integral de procesamiento.", prod: "Archivo Mi_Cuento_Nombre.docx." },
+                    { sem: "Semana 26", trim: "3.er Trimestre", dur: "1 Semana", tema: "Insertar Formas e Imágenes", pda: "Agrega formas geométricas e ilustraciones a documentos de texto.", inicio: "Pestaña Insertar > Formas (estrellas, flechas, llamadas).", desarrollo: "Inserción de 3 formas en el documento, cambiando color de relleno.", cierre: "Aprender a eliminar formas con la tecla Supr.", mat: "Procesador de textos.", eval: "Lista de cotejo de objetos.", prod: "Documento con texto y formas." },
+                    { sem: "Semana 27-28", trim: "3.er Trimestre", dur: "Quincena", tema: "Ajuste de Texto e Imagen", pda: "Configura el ajuste de imagen (Cuadrado/Delante) para moverla libremente.", inicio: "¿Por qué no se mueve la imagen recién insertada en el texto?", desarrollo: "Diseño de tarjeta de felicitación: insertar imagen con ajuste Cuadrado.", cierre: "Muestra de tarjetas impresas o proyectadas.", mat: "Procesador de textos, imágenes.", eval: "Rúbrica de ajuste de imagen.", prod: "Tarjeta de felicitación ilustrada." },
+                    { sem: "Semana 29-30", trim: "3.er Trimestre", dur: "Quincena", tema: "Algoritmos de la Vida Diaria", pda: "Descompone actividades cotidianas en pasos lógicos ordenados.", inicio: "¿Cuál es el orden exacto para amarrarse las agujetas?", desarrollo: "Escritura y dibujo en Word de 5 pasos para preparar un refrigerio.", cierre: "Intercambio de algoritmos para verificar que no falten pasos.", mat: "Word / Cuaderno.", eval: "Lista de cotejo de algoritmos.", prod: "Algoritmo ilustrado paso a paso." },
+                    { sem: "Semana 31-32", trim: "3.er Trimestre", dur: "Quincena", tema: "Programación con Bloques (Code.org Curso B)", pda: "Aplica secuencias de bloques para resolver laberintos con giros.", inicio: "Diferenciar giros a izquierda y derecha según la vista del personaje.", desarrollo: "Resolución de los niveles 1 al 8 del laberinto en Code.org Curso B.", cierre: "Análisis del nivel más complejo del curso.", mat: "Code.org Curso B.", eval: "Registro de avance en plataforma.", prod: "8 niveles superados en Code.org." },
+                    { sem: "Semana 33-34", trim: "3.er Trimestre", dur: "Quincena", tema: "El Concepto de Bucle (Repetir)", pda: "Utiliza bloques de repetición para optimizar y reducir código.", inicio: "Reto: Caminar 10 pasos usando 1 solo bloque en lugar de 10 idénticos.", desarrollo: "Resolución de retos con bucles; comparar número de bloques usados.", cierre: "Reflexión sobre cómo los programadores ahorran tiempo.", mat: "Code.org Curso B.", eval: "Lista de verificación de bucles.", prod: "Retos de bucles optimizados." },
+                    { sem: "Semana 35-36", trim: "3.er Trimestre", dur: "Quincena", tema: "Proyecto Final: Cuento Ilustrado Interactivo", pda: "Integra procesador de textos y lógica de programación.", inicio: "Presentación de las pautas del proyecto final integrador.", desarrollo: "Creación de la historia ilustrada acompañada del algoritmo del personaje.", cierre: "Exhibición de trabajos en el aula de medios.", mat: "Word, Code.org.", eval: "Rúbrica integral de 2.º grado.", prod: "Proyecto final impreso y evaluado." },
+                    { sem: "Semana 37-38", trim: "3.er Trimestre", dur: "Quincena", tema: "Cierre y Evaluación Anual", pda: "Consolida aprendizajes del año y organiza su portafolio digital.", inicio: "Revisión de carpetas personales y eliminación de temporales.", desarrollo: "Juego de conocimientos tecnológicos y entrega de reconocimientos.", cierre: "Agradecimientos y compromisos de cuidado del laboratorio.", mat: "Portafolios digitales.", eval: "Evaluación sumativa global.", prod: "Portafolio digital 2.º completo." }
+                ]
+            },
+            "3° Primaria": {
+                fase: "Fase 4",
+                subtitulo: "Procesamiento Estructurado, Búsqueda en Internet y Algoritmos",
+                semanas: [
+                    { sem: "Semana 1", trim: "1.er Trimestre", dur: "1 Semana", tema: "Diagnóstico y Mecanografía Fluida", pda: "Evalúa digitación alfanumérica y postura en el teclado guía.", inicio: "Prueba rápida de velocidad y precisión en TypingClub.", desarrollo: "Ejercicios de digitación de la fila guía (ASDF - JKLÑ) con ambas manos.", cierre: "Establecer metas personales de palabras por minuto (PPM).", mat: "TypingClub / Tux Typing.", eval: "Registro de PPM y precisión.", prod: "Reporte de velocidad inicial." },
+                    { sem: "Semana 2-3", trim: "1.er Trimestre", dur: "Quincena", tema: "Atajos de Teclado (Ctrl+C, Ctrl+V, Ctrl+X)", pda: "Agiliza la edición de texto con atajos de copiado, pegado y corte.", inicio: "Demostración: Duplicar textos e imágenes en 1 segundo.", desarrollo: "Reorganización de párrafos desordenados usando únicamente atajos.", cierre: "Diferencia entre Copiar (duplica) y Cortar (mueve).", mat: "Procesador de textos.", eval: "Lista de cotejo de atajos.", prod: "Documento reorganizado con atajos." },
+                    { sem: "Semana 4-5", trim: "1.er Trimestre", dur: "Quincena", tema: "Listas con Viñetas y Numeración", pda: "Organiza información en listas ordenadas y personalizadas.", inicio: "¿Cómo hacer que una lista de útiles o pasos sea fácil de leer?", desarrollo: "Creación del reglamento con numeración y listas con viñetas personalizadas.", cierre: "Cambiar el símbolo de la viñeta por íconos creativos.", mat: "Procesador de textos.", eval: "Rúbrica de listas jerárquicas.", prod: "Reglamento del aula en listas." },
+                    { sem: "Semana 6-7", trim: "1.er Trimestre", dur: "Quincena", tema: "Configuración de Página y Márgenes", pda: "Modifica orientación, tamaño de papel y márgenes del documento.", inicio: "Comparar un diploma horizontal vs una carta vertical.", desarrollo: "Configuración de página horizontal tamaño Carta para elaborar un cartel.", cierre: "Verificación en vista previa de impresión (Ctrl+P).", mat: "Procesador de textos.", eval: "Lista de cotejo de diseño de página.", prod: "Cartel en formato horizontal." },
+                    { sem: "Semana 8-9", trim: "1.er Trimestre", dur: "Quincena", tema: "Diseño de Página: Bordes y Color", pda: "Aplica bordes decorativos, sombreado y color de fondo.", inicio: "Exploración de Pestaña Diseño > Bordes de página (arte).", desarrollo: "Diseño de un diploma escolar aplicando bordes artísticos y color tenue.", cierre: "Reflexión sobre el contraste para no gastar tinta de más.", mat: "Procesador de textos.", eval: "Rúbrica de diseño visual.", prod: "Diploma escolar formateado." },
+                    { sem: "Semana 10-11", trim: "1.er Trimestre", dur: "Quincena", tema: "Creación y Formato de Tablas", pda: "Diseña tablas con filas, columnas, bordes y sombreados.", inicio: "¿Por qué es más claro un horario en cuadro que en texto plano?", desarrollo: "Tabla de 6x7 para horario escolar; sombreado por materia y combinado.", cierre: "Uso de la tecla Tabulador para moverse entre celdas.", mat: "Procesador de textos.", eval: "Rúbrica de tablas estructuradas.", prod: "Archivo Horario_Escolar.docx." },
+                    { sem: "Semana 12-13", trim: "1.er Trimestre", dur: "Quincena", tema: "Proyecto Trimestral: Reporte Escolar", pda: "Integra tablas, viñetas y formatos en un informe de ciencias.", inicio: "Presentación del tema: Los Reinos de la Naturaleza.", desarrollo: "Elaboración del reporte integrando portada con borde, tabla y listas.", cierre: "Evaluación y coevaluación entre compañeros.", mat: "Procesador de textos.", eval: "Rúbrica sumativa Trimestre 1.", prod: "Reporte escolar formateado." },
+                    { sem: "Semana 14", trim: "2.° Trimestre", dur: "1 Semana", tema: "¿Qué es Internet y la Web?", pda: "Comprende el concepto de red mundial, servidores y páginas web.", inicio: "Analogía: La biblioteca más grande del mundo conectada por cables.", desarrollo: "Diagrama interactivo sobre cómo viaja la información en la red.", cierre: "Identificación de sitios web educativos seguros.", mat: "Navegadores web, videos.", eval: "Lista de cotejo conceptual.", prod: "Esquema ilustrado de Internet." },
+                    { sem: "Semana 15", trim: "2.° Trimestre", dur: "1 Semana", tema: "Navegadores vs Motores de Búsqueda", pda: "Distingue entre un navegador (Chrome) y un buscador (Google).", inicio: "¿Es lo mismo Google que Google Chrome? Análisis de la URL.", desarrollo: "Escribir URLs directas (.edu, .gob) vs realizar búsquedas por palabras.", cierre: "Revisión de los componentes de un enlace web.", mat: "Navegadores web.", eval: "Lista de cotejo de navegación.", prod: "Tabla comparativa Navegador/Buscador." },
+                    { sem: "Semana 16-17", trim: "2.° Trimestre", dur: "Quincena", tema: "Estrategias de Búsqueda Efectiva", pda: "Utiliza palabras clave precisas para encontrar información confiable.", inicio: "Comparar resultados buscando 'animales' vs 'animales en peligro Mexico'.", desarrollo: "Búsqueda guiada para tema escolar evitando anuncios publicitarios.", cierre: "Selección crítica de los mejores 2 resultados.", mat: "Navegador, procesador.", eval: "Rúbrica de búsqueda de información.", prod: "Ficha informativa con fuentes." },
+                    { sem: "Semana 18-19", trim: "2.° Trimestre", dur: "Quincena", tema: "Descarga Responsable de Imágenes", pda: "Filtra imágenes por tamaño/derechos y las descarga organizadamente.", inicio: "Uso de Pestaña Herramientas de Google Imágenes (Tamaño/Fondo PNG).", desarrollo: "Descarga de 4 imágenes de alta calidad a la carpeta 'Mis Imágenes'.", cierre: "Comprobar que las imágenes no se vean borrosas al insertarlas.", mat: "Navegador, procesador.", eval: "Lista de cotejo de descarga.", prod: "Banco de 4 imágenes citadas." },
+                    { sem: "Semana 20-21", trim: "2.° Trimestre", dur: "Quincena", tema: "Seguridad Digital: Datos Personales", pda: "Identifica qué información personal jamás debe compartirse en la red.", inicio: "Dinámica: El semáforo de la privacidad (Datos públicos vs privados).", desarrollo: "Elaboración de cartel en Word: 'Los 5 datos que protejo en línea'.", cierre: "Reflexión grupal sobre privacidad y cámaras web.", mat: "Procesador, Interland.", eval: "Rúbrica de cartel de seguridad.", prod: "Cartel de protección de datos." },
+                    { sem: "Semana 22-23", trim: "2.° Trimestre", dur: "Quincena", tema: "Detección de Anuncios y Trapas Web", pda: "Reconoce botones falsos de descarga y trampas de spam.", inicio: "Muestra de páginas con botones falsos de 'Descargar aquí'.", desarrollo: "Análisis de casos para detectar enlaces seguros (https y candado).", cierre: "Regla de oro: Consultar a un adulto antes de dar clic.", mat: "Presentaciones con capturas.", eval: "Lista de sitios confiables.", prod: "Test de detección superado." },
+                    { sem: "Semana 24-25", trim: "2.° Trimestre", dur: "Quincena", tema: "Proyecto Trimestral: Ficha Enciclopédica", pda: "Investiga en la web e integra texto, imágenes y fuentes en Word.", inicio: "Asignación de temas históricos o científicos para la ficha.", desarrollo: "Búsqueda de información, redacción propia, inserción de imágenes y enlace.", cierre: "Compilación de fichas en un libro digital del grupo.", mat: "Navegador, Word.", eval: "Rúbrica sumativa Trimestre 2.", prod: "Ficha enciclopédica de 1 página." },
+                    { sem: "Semana 26", trim: "3.er Trimestre", dur: "1 Semana", tema: "Pilares del Pensamiento Computacional", pda: "Conoce: Descomposición, Patrones, Abstracción y Algoritmos.", inicio: "Ejemplo: ¿Cómo desarma un mecánico un auto para arreglarlo?", desarrollo: "Ejercicios lógicos en papel identificando patrones y algoritmos.", cierre: "Puesta en común de soluciones lógicas.", mat: "Fichas de trabajo impresas.", eval: "Lista de cotejo conceptual.", prod: "Ficha de pensamiento computacional." },
+                    { sem: "Semana 27-28", trim: "3.er Trimestre", dur: "Quincena", tema: "Diagramas de Flujo Básicos", pda: "Representa algoritmos con símbolos: Inicio, Acción y Decisión.", inicio: "Simbología: Óvalo (Inicio), Rectángulo (Acción), Rombo (Decisión).", desarrollo: "Diseño del diagrama para cruzar la calle de forma segura.", cierre: "Verificación de las rutas lógicas del diagrama.", mat: "Word Formas / Papel.", eval: "Rúbrica de diagramas de flujo.", prod: "Diagrama de flujo estructurado." },
+                    { sem: "Semana 29-30", trim: "3.er Trimestre", dur: "Quincena", tema: "Bucles Anidados (Code.org Curso C)", pda: "Utiliza bucles dentro de bucles para patrones geométricos complejos.", inicio: "Reto del artista: Dibujar un cuadrado repitiendo 4 veces avance y giro.", desarrollo: "Resolución de niveles 1 al 8 del Curso C usando bucles anidados.", cierre: "Calcular el número total de pasos multiplicando bucles.", mat: "Code.org Curso C.", eval: "Registro de avance en plataforma.", prod: "8 niveles en Code.org superados." },
+                    { sem: "Semana 31-32", trim: "3.er Trimestre", dur: "Quincena", tema: "Depuración de Código (Debugging)", pda: "Identifica y corrige errores en algoritmos de programación.", inicio: "Analogía: El detective que encuentra por qué el robot choca.", desarrollo: "Cacería de Bugs: corregir 5 programas con errores intencionales.", cierre: "Estrategias para probar el código paso a paso.", mat: "Code.org / Scratch.", eval: "Lista de cotejo de depuración.", prod: "5 programas corregidos." },
+                    { sem: "Semana 33-34", trim: "3.er Trimestre", dur: "Quincena", tema: "Condicionales Simples (`Si...`)", pda: "Aplica decisiones lógicas según el estado del entorno.", inicio: "Si llueve -> llevo paraguas; Si hay camino a la derecha -> giro.", desarrollo: "Resolución de retos en Code.org con condicionales simples.", cierre: "Reflexión sobre cómo los juegos deciden si ganas o pierdes.", mat: "Code.org Curso C.", eval: "Rúbrica de condicionales.", prod: "Retos de condicionales superados." },
+                    { sem: "Semana 35-36", trim: "3.er Trimestre", dur: "Quincena", tema: "Proyecto Final: Laberinto Lógico", pda: "Diseña un videojuego aplicando bucles y condicionales.", inicio: "Presentación del reto: Programar ruta evitando obstáculos.", desarrollo: "Construcción del proyecto en plataforma y depuración de errores.", cierre: "Feria de videojuegos en el salón de cómputo.", mat: "Code.org / Scratch.", eval: "Rúbrica de programación final.", prod: "Videojuego de laberinto funcional." },
+                    { sem: "Semana 37-38", trim: "3.er Trimestre", dur: "Quincena", tema: "Evaluación Final y Certificados", pda: "Consolida el portafolio anual y evalúa aprendizajes de 3.er grado.", inicio: "Compilación de proyectos en la carpeta escolar.", desarrollo: "Evaluación práctica anual de habilidades digitales.", cierre: "Entrega de certificados oficiales de Code.org / Hora del Código.", mat: "Certificados impresos.", eval: "Evaluación global sumativa.", prod: "Portafolio y Certificado entregado." }
+                ]
+            },
+            "4° Primaria": {
+                fase: "Fase 4",
+                subtitulo: "Presentaciones Dinámicas, Ciudadanía e Introducción a Scratch",
+                semanas: [
+                    { sem: "Semana 1", trim: "1.er Trimestre", dur: "1 Semana", tema: "Diagnóstico y Presentaciones Digitales", pda: "Evalúa habilidades previas e introduce PowerPoint/Slides.", inicio: "Comparar documento Word vs Diapositiva: ¿En qué se diferencian?", desarrollo: "Exploración de la interfaz; creación de diapositiva de portada.", cierre: "¿Para qué tareas escolares es mejor usar diapositivas?", mat: "PowerPoint / Slides.", eval: "Lista de cotejo diagnóstico.", prod: "Diapositiva de portada creada." },
+                    { sem: "Semana 2-3", trim: "1.er Trimestre", dur: "Quincena", tema: "Diseño de Diapositivas y Temas", pda: "Aplica temas de diseño coherentes y estructuras equilibradas.", inicio: "Regla del contraste: Texto oscuro en fondo claro o viceversa.", desarrollo: "Creación de presentación de 4 láminas aplicando tema uniforme.", cierre: "Análisis de diapositivas legibles vs saturadas.", mat: "PowerPoint / Slides.", eval: "Rúbrica de diseño visual.", prod: "Presentación con tema aplicado." },
+                    { sem: "Semana 4-5", trim: "1.er Trimestre", dur: "Quincena", tema: "Jerarquía de Texto y Regla '6x6'", pda: "Aplica jerarquías visuales y evita la sobrecarga de texto.", inicio: "Demostración de la regla del 6x6 (máximo 6 líneas por lámina).", desarrollo: "Transformación de texto largo enciclopédico en puntos clave.", cierre: "Revisión de tamaños de fuente (Títulos 36-44 pt, Texto 24 pt).", mat: "PowerPoint.", eval: "Lista de síntesis y jerarquía.", prod: "Diapositivas sintetizadas 6x6." },
+                    { sem: "Semana 6-7", trim: "1.er Trimestre", dur: "Quincena", tema: "Imágenes PNG e Ilustraciones", pda: "Inserta y alinea imágenes transparentes y esquemas visuales.", inicio: "Diferencia entre imagen con fondo (JPG) y transparente (PNG).", desarrollo: "Diseño de lámina del Sistema Solar con planetas PNG recortados.", cierre: "Uso de herramientas de alineación horizontal de objetos.", mat: "PowerPoint, banco PNG.", eval: "Rúbrica de composición visual.", prod: "Lámina del Sistema Solar PNG." },
+                    { sem: "Semana 8-9", trim: "1.er Trimestre", dur: "Quincena", tema: "Transiciones de Diapositivas", pda: "Configura transiciones suaves y profesionales entre láminas.", inicio: "¿Por qué las transiciones exageradas distraen al público?", desarrollo: "Aplicación de transiciones sobrias (Desvanecer) con duración de 1 s.", cierre: "Prueba del modo Presentación con F5 y teclado.", mat: "PowerPoint.", eval: "Lista de verificación de transiciones.", prod: "Presentación con transiciones." },
+                    { sem: "Semana 10-11", trim: "1.er Trimestre", dur: "Quincena", tema: "Animaciones de Objetos (Entrada/Salida)", pda: "Controla orden y tiempo de aparición con el Panel de Animación.", inicio: "¿Cómo hacer que los puntos aparezcan según vas hablando?", desarrollo: "Configurar animaciones de entrada en orden: Título -> Texto -> Imagen.", cierre: "Comprobar que no existan animaciones innecesarias.", mat: "PowerPoint.", eval: "Rúbrica de panel de animación.", prod: "Presentación animada en orden." },
+                    { sem: "Semana 12-13", trim: "1.er Trimestre", dur: "Quincena", tema: "Proyecto Trimestral: Exposición Digital", pda: "Diseña y expone una presentación de 5 láminas sobre ciencias.", inicio: "Preparación del guion de exposición apoyado en diapositivas.", desarrollo: "Elaboración final de la presentación y ensayo de tiempos.", cierre: "Exposición oral de 2 minutos por equipo ante el salón.", mat: "PowerPoint, proyector.", eval: "Rúbrica sumativa Trimestre 1.", prod: "Exposición escolar apoyada en PPT." },
+                    { sem: "Semana 14", trim: "2.° Trimestre", dur: "1 Semana", tema: "Evaluación Crítica de Fuentes Web", pda: "Aprende a verificar la credibilidad de sitios (.edu, .gob).", inicio: "Análisis de una Noticia Falsa (Fake News) viral.", desarrollo: "Taller de verificación: evaluar 3 páginas web sobre dinosaurios.", cierre: "Elaboración de lista de criterios para confiar en la red.", mat: "Navegadores web.", eval: "Lista de validación de fuentes.", prod: "Cuadro de fuentes evaluadas." },
+                    { sem: "Semana 15", trim: "2.° Trimestre", dur: "1 Semana", tema: "Plagio, Citas y Derechos de Autor", pda: "Comprende la propiedad intelectual y cita fuentes escolares.", inicio: "¿Qué sentirías si alguien firma tu dibujo como suyo?", desarrollo: "Práctica de paráfrasis y creación de lámina de 'Fuentes Citadas'.", cierre: "Revisión de enlaces y autores citados adecuadamente.", mat: "PowerPoint / Word.", eval: "Rúbrica de honestidad académica.", prod: "Lámina de fuentes bibliográficas." },
+                    { sem: "Semana 16-17", trim: "2.° Trimestre", dur: "Quincena", tema: "Ciberacoso y Netiqueta Escolar", pda: "Reconoce conductas de acoso virtual y elabora un decálogo.", inicio: "Análisis de un caso de estudio sobre mensajes en juegos en línea.", desarrollo: "Diseño de campaña visual: 'Netiqueta y Cero Ciberacoso'.", cierre: "Estrategias: Bloquear, no responder, guardar pruebas y avisar.", mat: "PowerPoint / Canva.", eval: "Rúbrica de ciudadanía digital.", prod: "Decálogo de convivencia escolar." },
+                    { sem: "Semana 18-19", trim: "2.° Trimestre", dur: "Quincena", tema: "Contraseñas Robustas y Cuentas", pda: "Crea y evalúa la fortaleza de contraseñas seguras.", inicio: "¿Por qué '123456' es la peor contraseña del mundo?", desarrollo: "Fórmula segura: Frase clave + números + símbolos. Prueba en simulador.", cierre: "Regla: Las contraseñas son secretas y sólo para los padres.", mat: "Simulador de contraseñas.", eval: "Lista de verificación de cuentas.", prod: "Tabla de contraseñas creadas." },
+                    { sem: "Semana 20-21", trim: "2.° Trimestre", dur: "Quincena", tema: "Presentaciones Interactivas", pda: "Crea botones de acción e hipervínculos entre láminas.", inicio: "Demostración de presentación que funciona como página web.", desarrollo: "Diseño de menú principal con 3 botones y enlace a láminas.", cierre: "Prueba de funcionamiento de todos los botones.", mat: "PowerPoint.", eval: "Rúbrica de interactividad.", prod: "Presentación interactiva no lineal." },
+                    { sem: "Semana 22-23", trim: "2.° Trimestre", dur: "Quincena", tema: "Inserción de Audio y Video", pda: "Integra archivos multimedia para enriquecer la exposición.", inicio: "¿Cómo insertar un video corto o una voz grabada en la lámina?", desarrollo: "Inserción de clip de audio con reproducción automática y video.", cierre: "Ajuste de volumen y recorte de duración del audio.", mat: "PowerPoint, archivos audio.", eval: "Lista de cotejo multimedia.", prod: "Diapositiva con audio/video." },
+                    { sem: "Semana 24-25", trim: "2.° Trimestre", dur: "Quincena", tema: "Proyecto Trimestral: Trivia Interactiva", pda: "Crea un juego de preguntas y respuestas con hipervínculos.", inicio: "Estructuración del árbol de decisiones de la trivia (5 preguntas).", desarrollo: "Programación de botones a láminas de acierto o reintento.", cierre: "Prueba cruzada de trivias entre compañeros del grupo.", mat: "PowerPoint.", eval: "Rúbrica sumativa Trimestre 2.", prod: "Trivia interactiva terminada." },
+                    { sem: "Semana 26", trim: "3.er Trimestre", dur: "1 Semana", tema: "Entorno de Scratch 3.0", pda: "Reconoce escenario, objetos (sprites), bloques y scripts.", inicio: "Scratch: Dejamos de ser jugadores para ser creadores.", desarrollo: "Exploración de la interfaz; añadir objetos, fondos y categorías.", cierre: "Identificación de bandera verde y botón de parada.", mat: "Scratch 3.0 Desktop.", eval: "Lista de familiarización Scratch.", prod: "Escenario configurado con sprite." },
+                    { sem: "Semana 27-28", trim: "3.er Trimestre", dur: "Quincena", tema: "Movimiento y Coordenadas (X, Y)", pda: "Programa desplazamientos mediante bloques y plano cartesiano.", inicio: "Explicación del plano cartesiano (Eje X horizontal, Eje Y vertical).", desarrollo: "Programar sprite para mover 100 pasos, girar 90° y rebotar.", cierre: "Comprobación de posiciones X e Y en el panel del objeto.", mat: "Scratch 3.0.", eval: "Rúbrica de coordenadas Scratch.", prod: "Script de movimiento en bucle." },
+                    { sem: "Semana 29-30", trim: "3.er Trimestre", dur: "Quincena", tema: "Eventos, Disfraces y Animación", pda: "Crea la ilusión de caminata cambiando disfraces del sprite.", inicio: "¿Cómo se hacen los dibujos animados? El truco de pasar imágenes.", desarrollo: "Bloque bandera verde + bucle por siempre + siguiente disfraz (0.1 s).", cierre: "Ajuste de tiempo para que la caminata luzca fluida.", mat: "Scratch 3.0.", eval: "Lista de animación de disfraces.", prod: "Sprite caminando fluidamente." },
+                    { sem: "Semana 31-32", trim: "3.er Trimestre", dur: "Quincena", tema: "Sonidos y Diálogos entre Sprites", pda: "Sincroniza diálogos y efectos de sonido entre dos objetos.", inicio: "Creación de una historieta o chiste animado de 2 personajes.", desarrollo: "Programar Personaje 1 (habla 2 s) -> espera -> Personaje 2 (responde).", cierre: "Prueba de tiempos para que no hablen al mismo tiempo.", mat: "Scratch 3.0.", eval: "Rúbrica de sincronización.", prod: "Historieta animada con sonido." },
+                    { sem: "Semana 33-34", trim: "3.er Trimestre", dur: "Quincena", tema: "Control del Sprite con Teclado", pda: "Programa interactividad controlando el objeto con flechas.", inicio: "¿Cómo hacer que se mueva cuando el usuario presiona las flechas?", desarrollo: "Bloques `al presionar tecla [flecha]` y cambio de dirección.", cierre: "Prueba del sprite recorriendo un laberinto en el fondo.", mat: "Scratch 3.0.", eval: "Lista de control por teclado.", prod: "Sprite movido por flechas." },
+                    { sem: "Semana 35-36", trim: "3.er Trimestre", dur: "Quincena", tema: "Proyecto Final: Minijuego en Scratch", pda: "Integra movimiento, control por teclado, disfraces y sonidos.", inicio: "Definición de reglas del juego (ej. atrapa objetos o esquiva).", desarrollo: "Programación del juego, diseño de fondo de victoria y depuración.", cierre: "Muestra de videojuegos en el aula con juego compartido.", mat: "Scratch 3.0.", eval: "Rúbrica integral de Scratch.", prod: "Archivo .sb3 de minijuego." },
+                    { sem: "Semana 37-38", trim: "3.er Trimestre", dur: "Quincena", tema: "Evaluación Anual y Portafolio Digital", pda: "Consolida aprendizajes del año y organiza el portafolio 4.º.", inicio: "Revisión y respaldo de presentaciones PPT y proyectos Scratch.", desarrollo: "Evaluación sumativa anual de habilidades digitales.", cierre: "Cierre del ciclo escolar y entrega de reconocimientos.", mat: "Portafolio digital.", eval: "Evaluación global de fin de ciclo.", prod: "Portafolio 4.º evaluado." }
+                ]
+            },
+            "5° Primaria": {
+                fase: "Fase 5",
+                subtitulo: "Análisis de Datos en Hojas de Cálculo, Gráficos y Videojuegos",
+                semanas: [
+                    { sem: "Semana 1", trim: "1.er Trimestre", dur: "1 Semana", tema: "Diagnóstico e Introducción a Excel/Sheets", pda: "Identifica la cuadrícula: filas, columnas y coordenadas de celdas.", inicio: "¿Cómo llevan el inventario las tiendas sin equivocarse?", desarrollo: "Exploración de la interfaz; identificar coordenadas (B4, D10) y cursores.", cierre: "Juego de 'Batalla Naval' en Excel buscando celdas.", mat: "MS Excel / Sheets.", eval: "Lista de cotejo de cuadrícula.", prod: "Coordenadas identificadas." },
+                    { sem: "Semana 2-3", trim: "1.er Trimestre", dur: "Quincena", tema: "Tipos de Datos y Formato de Celdas", pda: "Distingue texto, números y fechas, aplicando bordes y alineación.", inicio: "Diferencia: El texto se alinea a la izquierda y el número a la derecha.", desarrollo: "Captura de lista de 8 artículos con precios; bordes y sombreado.", cierre: "Comprobación de la legibilidad de la tabla.", mat: "Excel / Sheets.", eval: "Rúbrica de formato de celdas.", prod: "Tabla formateada de artículos." },
+                    { sem: "Semana 4-5", trim: "1.er Trimestre", dur: "Quincena", tema: "Fórmulas Básicas (`+`, `-`, `*`, `/`)", pda: "Escribe fórmulas iniciando con `=` y operadores aritméticos.", inicio: "Principio clave: Toda fórmula empieza con `=`. Comparar `=15+20` vs `=A1+B1`.", desarrollo: "Cálculo del subtotal de una venta (Cantidad * Precio) en 6 productos.", cierre: "Demostración del recálculo automático al cambiar precios.", mat: "Excel / Sheets.", eval: "Rúbrica de sintaxis de fórmulas.", prod: "Tabla con fórmulas funcionales." },
+                    { sem: "Semana 6-7", trim: "1.er Trimestre", dur: "Quincena", tema: "La Función `=SUMA` y Autollenado", pda: "Aplica `=SUMA(rango)` y utiliza el controlador de relleno.", inicio: "¿Cómo sumar 50 celdas sin presionar `+` cincuenta veces?", desarrollo: "Uso de `=SUMA(D2:D10)` y práctica de arrastre de fórmulas.", cierre: "Verificación de totales automáticos en tabla de gastos.", mat: "Excel / Sheets.", eval: "Lista de funciones y autollenado.", prod: "Tabla de gastos con `=SUMA`." },
+                    { sem: "Semana 8-9", trim: "1.er Trimestre", dur: "Quincena", tema: "Funciones: `=PROMEDIO`, `=MAX`, `=MIN`", pda: "Calcula promedios escolares y notas máximas/mínimas.", inicio: "¿Cómo calcula el profesor el promedio de la materia?", desarrollo: "Boleta de calificaciones de 6 materias; aplicar `=PROMEDIO` e identificadores.", cierre: "Análisis de promedios obtenidos por alumno.", mat: "Excel / Sheets.", eval: "Rúbrica de funciones estadísticas.", prod: "Boleta escolar automatizada." },
+                    { sem: "Semana 10-11", trim: "1.er Trimestre", dur: "Quincena", tema: "Formatos Numéricos (Moneda, %)", pda: "Aplica formato de pesos (`$`) y porcentajes a datos financieros.", inicio: "¿Por qué no escribir a mano el signo `$` dentro de la celda?", desarrollo: "Configurar formato Moneda a precios y calcular el IVA (16%).", cierre: "Comprobar que las fórmulas sigan calculando correctamente.", mat: "Excel / Sheets.", eval: "Lista de formato numérico.", prod: "Factura comercial con IVA." },
+                    { sem: "Semana 12-13", trim: "1.er Trimestre", dur: "Quincena", tema: "Proyecto Trimestral: Presupuesto Kermés", pda: "Integra tablas, fórmulas y funciones en un proyecto financiero.", inicio: "Planteamiento: Organizar gastos e ingresos de puestos de kermés.", desarrollo: "Modelo en Excel: costos, precios, ganancia estimada y totales.", cierre: "Presentación y análisis de rentabilidad por equipo.", mat: "Excel / Sheets.", eval: "Rúbrica sumativa Trimestre 1.", prod: "Archivo Presupuesto_Kermes.xlsx." },
+                    { sem: "Semana 14", trim: "2.° Trimestre", dur: "1 Semana", tema: "Introducción a los Gráficos Estadísticos", pda: "Comprende la representación visual de datos numéricos.", inicio: "Tabla con 100 números vs Gráfico de barras: ¿Cuál se entiende antes?", desarrollo: "Selección de rango e inserción de gráfico de columnas 2D.", cierre: "Identificar ejes, series de datos y categorías.", mat: "Excel / Sheets.", eval: "Lista de cotejo de gráficos.", prod: "Gráfico de columnas insertado." },
+                    { sem: "Semana 15", trim: "2.° Trimestre", dur: "1 Semana", tema: "Gráficos de Columnas vs Circulares", pda: "Selecciona el gráfico adecuado según la información.", inicio: "¿Cuándo usar barras (comparar) y cuándo circular (partes del 100%)?", desarrollo: "Gráfico circular para representar porcentajes de votación escolar.", cierre: "Aplicar etiquetas de datos con porcentajes claros.", mat: "Excel / Sheets.", eval: "Rúbrica de selección de gráfico.", prod: "Gráfico circular porcentual." },
+                    { sem: "Semana 16-17", trim: "2.° Trimestre", dur: "Quincena", tema: "Personalización y Lectura de Gráficos", pda: "Edita títulos, leyendas y colores para redactar conclusiones.", inicio: "Detección de errores en gráficos: sin títulos o escalas falsas.", desarrollo: "Personalizar gráfico de reciclaje y redactar 3 conclusiones en Word.", cierre: "Exposición rápida de resultados encontrados.", mat: "Excel, Word.", eval: "Rúbrica de análisis de datos.", prod: "Reporte gráfico con conclusiones." },
+                    { sem: "Semana 18-19", trim: "2.° Trimestre", dur: "Quincena", tema: "Huella Digital y Reputación Online", pda: "Analiza el rastro permanente que dejamos al navegar en la red.", inicio: "Concepto de Huella Digital: Lo publicado permanece para siempre.", desarrollo: "Taller de casos: evaluación de perfiles ficticios e impacto futuro.", cierre: "Elaboración de un compromiso personal de huella digital positiva.", mat: "Hojas de trabajo.", eval: "Rúbrica de ética digital.", prod: "Manifiesto de Huella Digital." },
+                    { sem: "Semana 20-21", trim: "2.° Trimestre", dur: "Quincena", tema: "Phishing, Estafas y Fraudes", pda: "Identifica mensajes y sitios web engañosos para robar datos.", inicio: "Mensaje engañoso: '¡Ganaste un premio, haz clic aquí!'.", desarrollo: "Taller de Phishing: detectar remitentes falsos, faltas y URLs raras.", cierre: "Protocolo de acción ante mensajes sospechosos.", mat: "Casos simulados.", eval: "Lista de detección de Phishing.", prod: "Infografía de prevención de estafas." },
+                    { sem: "Semana 22-23", trim: "2.° Trimestre", dur: "Quincena", tema: "Creative Commons y Autoría", pda: "Utiliza recursos web respetando licencias libres y autoría.", inicio: "Copyright (todos los derechos) vs Creative Commons (compartir).", desarrollo: "Búsqueda de música e imágenes CC en repositorios libres y citado.", cierre: "Revisión de licencias (BY, NC, SA).", mat: "Navegador web.", eval: "Lista de atribución de autor.", prod: "Catálogo de recursos libres citados." },
+                    { sem: "Semana 24-25", trim: "2.° Trimestre", dur: "Quincena", tema: "Proyecto Trimestral: Encuesta Escolar", pda: "Aplica encuesta, procesa datos en Excel y elabora reporte.", inicio: "Diseño de encuesta de 3 preguntas sobre lectura o deporte.", desarrollo: "Captura de respuestas de compañeros, cálculo de % y 2 gráficos.", cierre: "Presentación del reporte final ante el grupo.", mat: "Excel, Word.", eval: "Rúbrica sumativa Trimestre 2.", prod: "Reporte de encuesta escolar." },
+                    { sem: "Semana 26", trim: "3.er Trimestre", dur: "1 Semana", tema: "Variables en Scratch: Puntos y Vidas", pda: "Comprende variables como contenedores de datos que cambian.", inicio: "¿Cómo sabe el videojuego cuántas monedas llevamos acumuladas?", desarrollo: "Crear variable `Puntos`; cambiar por 1 al hacer clic en sprite.", cierre: "Reiniciar variable a 0 al presionar la bandera verde.", mat: "Scratch 3.0.", eval: "Lista de cotejo de variables.", prod: "Script con marcador funcional." },
+                    { sem: "Semana 27-28", trim: "3.er Trimestre", dur: "Quincena", tema: "Sensores y Colisiones en Scratch", pda: "Utiliza bloques de sensores (`¿tocando color?`) para interacción.", inicio: "Juego de laberinto: Si toca la pared, regresa al inicio.", desarrollo: "Programación de colisiones con obstáculos en movimiento.", cierre: "Prueba de jugabilidad y ajuste de velocidad.", mat: "Scratch 3.0.", eval: "Rúbrica de sensores Scratch.", prod: "Laberinto con colisiones activo." },
+                    { sem: "Semana 29-30", trim: "3.er Trimestre", dur: "Quincena", tema: "Condicionales Compuestas (`Si... Sino`)", pda: "Implementa lógica ramificada de decisión para victoria o derrota.", inicio: "Si respuesta es correcta -> Suma 10 pts, Sino -> Pierde 1 vida.", desarrollo: "Trivia interactiva en Scratch con preguntas de usuario y respuestas.", cierre: "Depuración de respuestas erróneas.", mat: "Scratch 3.0.", eval: "Rúbrica de condicionales dobles.", prod: "Trivia interactiva con vidas." },
+                    { sem: "Semana 31-32", trim: "3.er Trimestre", dur: "Quincena", tema: "Temporizador y Pantallas Fin de Juego", pda: "Programa cuenta regresiva y pantallas de 'Game Over' / 'Ganaste'.", inicio: "Uso de variable `Tiempo`, restar 1 cada segundo hasta llegar a 0.", desarrollo: "Programación de fondos especiales al terminar el tiempo.", cierre: "Prueba de límites de tiempo en el juego.", mat: "Scratch 3.0.", eval: "Lista de verificación de tiempo.", prod: "Juego con temporizador y finales." },
+                    { sem: "Semana 33-34", trim: "3.er Trimestre", dur: "Quincena", tema: "Clonación y Generación Aleatoria", pda: "Utiliza clones para generar objetos que caen en posiciones al azar.", inicio: "¿Cómo hacer que caigan muchas manzanas sin crear 50 objetos?", desarrollo: "Bloque `crear clon de mí mismo` con coordenadas X al azar.", cierre: "Ajuste de la velocidad de caída de los clones.", mat: "Scratch 3.0.", eval: "Rúbrica de clonación Scratch.", prod: "Minijuego de atrapar objetos." },
+                    { sem: "Semana 35-36", trim: "3.er Trimestre", dur: "Quincena", tema: "Proyecto Final: Videojuego Educativo", pda: "Integra variables, sensores, clones y temporizadores en un juego.", inicio: "Planificación del juego en papel (Mecánica, Reglas y Objetivo).", desarrollo: "Desarrollo del código en Scratch, pruebas entre pares y depuración.", cierre: "Feria de videojuegos de 5.º grado en la escuela.", mat: "Scratch 3.0.", eval: "Rúbrica integral de videojuegos.", prod: "Videojuego educativo .sb3." },
+                    { sem: "Semana 37-38", trim: "3.er Trimestre", dur: "Quincena", tema: "Evaluación Final y Portafolio 5.º", pda: "Consolida evidencias (hojas de cálculo y proyectos Scratch).", inicio: "Organización de la carpeta personal del ciclo escolar.", desarrollo: "Evaluación global sumativa de conocimientos digitales.", cierre: "Reflexión final sobre análisis de datos y programación.", mat: "Portafolio digital.", eval: "Evaluación global de 5.º.", prod: "Portafolio 5.º evaluado." }
+                ]
+            },
+            "6° Primaria": {
+                fase: "Fase 5",
+                subtitulo: "Trabajo Colaborativo en la Nube, Diseño Multimedia e Introducción a la IA",
+                semanas: [
+                    { sem: "Semana 1", trim: "1.er Trimestre", dur: "1 Semana", tema: "Almacenamiento en la Nube (Drive/OneDrive)", pda: "Comprende la nube como espacio de almacenamiento y sincronización.", inicio: "¿Dónde se guardan los archivos cuando no usamos USB? La nube.", desarrollo: "Configuración de la unidad escolar; crear carpetas por materias.", cierre: "Ventajas de acceder a tareas desde cualquier dispositivo.", mat: "Google Drive / OneDrive.", eval: "Lista de cotejo de carpetas nube.", prod: "Unidad escolar estructurada." },
+                    { sem: "Semana 2-3", trim: "1.er Trimestre", dur: "Quincena", tema: "Documentos Compartidos y Coedición", pda: "Colabora en tiempo real aplicando permisos (Lector, Editor).", inicio: "¿Cómo trabajar 3 personas en el mismo documento al mismo tiempo?", desarrollo: "Redacción en equipos de 3 de un ensayo escolar simultáneo.", cierre: "Revisión del Historial de Versiones para recuperar cambios.", mat: "Google Docs / Word Online.", eval: "Rúbrica de coedición en nube.", prod: "Ensayo compartido coeditado." },
+                    { sem: "Semana 4-5", trim: "1.er Trimestre", dur: "Quincena", tema: "Correo Escolar y Netiqueta Formal", pda: "Redacta correos formales y adjunta archivos en formato PDF.", inicio: "Análisis de partes de correo: Asunto, Saludo, Cuerpo, Despedida.", desarrollo: "Envío de correo formal entregando tarea adjunta en formato PDF.", cierre: "Netiqueta: Evitar mayúsculas sostenidas y usar lenguaje formal.", mat: "Correo escolar.", eval: "Rúbrica de correo formal.", prod: "Correo enviado con PDF adjunto." },
+                    { sem: "Semana 6-7", trim: "1.er Trimestre", dur: "Quincena", tema: "Formularios Digitales (Google Forms)", pda: "Diseña encuestas interactivas con preguntas de opción múltiple y escalas.", inicio: "¿Cómo recolectar opiniones de la escuela sin gastar papel?", desarrollo: "Creación de formulario de 6 preguntas sobre uso de redes o lectura.", cierre: "Configuración de enlaces de respuesta y visualización.", mat: "Google Forms / MS Forms.", eval: "Rúbrica de encuestas digitales.", prod: "Formulario digital compartido." },
+                    { sem: "Semana 8-9", trim: "1.er Trimestre", dur: "Quincena", tema: "Vinculación y Análisis de Respuestas", pda: "Vincula formulario a hoja de datos y analiza gráficos automáticos.", inicio: "Revisión en vivo de las respuestas llegando al formulario.", desarrollo: "Vinculación con Hoja de Cálculo; lectura de gráficos de pastel.", cierre: "Debate sobre las tendencias encontradas en la encuesta.", mat: "Google Forms + Sheets.", eval: "Lista de análisis de datos.", prod: "Hoja de respuestas analizada." },
+                    { sem: "Semana 10-11", trim: "1.er Trimestre", dur: "Quincena", tema: "Seguridad Avanzada (2FA) y Privacidad", pda: "Aplica medidas de seguridad robustas y autenticación en 2 pasos.", inicio: "¿Cómo evitar que hackeen nuestras cuentas escolares o personales?", desarrollo: "Configuración simulada de 2FA, cierre remoto de sesiones y permisos.", cierre: "Decálogo de seguridad para uso de PCs compartidas.", mat: "Presentación de seguridad.", eval: "Rúbrica de seguridad avanzada.", prod: "Checklist de seguridad de cuentas." },
+                    { sem: "Semana 12-13", trim: "1.er Trimestre", dur: "Quincena", tema: "Proyecto Trimestral: Gaceta Digital", pda: "Publica una revista escolar colaborativa en la nube.", inicio: "Asignación de roles (Director, Redactor, Fotógrafo, Diseñador).", desarrollo: "Maquetación de la gaceta en la nube, revisión y exportación a PDF.", cierre: "Publicación del boletín para la comunidad escolar.", mat: "Google Docs / Canva.", eval: "Rúbrica sumativa Trimestre 1.", prod: "Gaceta digital en PDF." },
+                    { sem: "Semana 14", trim: "2.° Trimestre", dur: "1 Semana", tema: "Principios de Diseño Gráfico", pda: "Aplica contraste, legibilidad, jerarquía visual y espacios.", inicio: "Análisis de carteles: ¿Por qué algunos son fáciles de leer?", desarrollo: "Rediseño de cartel saturado aplicando jerarquía visual clara.", cierre: "Identificación de paletas de colores armónicas.", mat: "Canva / Presentaciones.", eval: "Lista de cotejo de diseño.", prod: "Rediseño de cartel equilibrado." },
+                    { sem: "Semana 15", trim: "2.° Trimestre", dur: "1 Semana", tema: "Herramientas de Diseño (Canva para Edu)", pda: "Explora lienzos, banco de vectores, marcos y fuentes en Canva.", inicio: "Presentación de la interfaz de Canva y plantillas educativas.", desarrollo: "Diseño de portada temática para sus libretas escolares.", cierre: "Descarga del diseño en alta resolución (PNG/PDF).", mat: "Canva para Educación.", eval: "Rúbrica de lienzo digital.", prod: "Diseño de portada personalizado." },
+                    { sem: "Semana 16-17", trim: "2.° Trimestre", dur: "Quincena", tema: "Diseño de Infografías Educativas", pda: "Sintetiza temas complejos en infografías verticales con íconos.", inicio: "Estructura de infografía: Encabezado, bloques datos e íconos.", desarrollo: "Infografía sobre Calentamiento Global o Biodiversidad Mexicana.", cierre: "Revisión de síntesis de texto y contraste gráfico.", mat: "Canva / Presentaciones.", eval: "Rúbrica analítica infografías.", prod: "Infografía vertical educativa." },
+                    { sem: "Semana 18-19", trim: "2.° Trimestre", dur: "Quincena", tema: "Edición y Retoque Fotográfico", pda: "Aplica recorte, brillo/contraste y eliminación de fondo.", inicio: "¿Cómo mejorar una foto oscura o recortar a una persona?", desarrollo: "Uso de Photopea/Canva/Remove.bg para collage fotográfico histórico.", cierre: "Comparación de imágenes antes y después de editar.", mat: "Photopea / Canva.", eval: "Lista de retoque digital.", prod: "Collage fotográfico optimizado." },
+                    { sem: "Semana 20-21", trim: "2.° Trimestre", dur: "Quincena", tema: "Diseño de Trípticos y Folletos", pda: "Diseña folletos de 3 columnas por cara (portada, desarrollo).", inicio: "Estructura de plegado de tríptico: Caras exteriores e interiores.", desarrollo: "Creación de tríptico sobre prevención de adicciones o bullying.", cierre: "Impresión de prueba y armado físico del tríptico doblado.", mat: "Word / Canva.", eval: "Rúbrica de trípticos editoriales.", prod: "Tríptico impreso y armado." },
+                    { sem: "Semana 22-23", trim: "2.° Trimestre", dur: "Quincena", tema: "Producción de Audio y Podcasting", pda: "Graba voz, edita pistas y mezcla música de fondo libre con Audacity.", inicio: "¿Cómo se produce un programa de radio o podcast profesional?", desarrollo: "Grabación de cápsula de noticias escolares (1 min); edición y mezcla.", cierre: "Exportación de la cápsula a formato estándar MP3.", mat: "Audacity, audífonos.", eval: "Rúbrica de producción audio.", prod: "Podcast_Escolar.mp3 generado." },
+                    { sem: "Semana 24-25", trim: "2.° Trimestre", dur: "Quincena", tema: "Proyecto Trimestral: Campaña Social", pda: "Diseña paquete multimedia (infografía, cartel y podcast) para causa.", inicio: "Selección de causa (Cuidado del agua, No al acoso, Mascotas).", desarrollo: "Desarrollo de los 3 productos multimedia por equipo.", cierre: "Presentación pública del kit multimedia ante la escuela.", mat: "Canva, Audacity, proyector.", eval: "Rúbrica sumativa Trimestre 2.", prod: "Kit multimedia de campaña." },
+                    { sem: "Semana 26", trim: "3.er Trimestre", dur: "1 Semana", tema: "¿Qué es la Inteligencia Artificial (IA)?", pda: "Comprende fundamentos de la IA, datos de entrenamiento y patrones.", inicio: "¿Cómo sabe YouTube qué video recomendarte?", desarrollo: "Exploración: Algoritmos vs Inteligencia Artificial. Usos diarios.", cierre: "Debate: ¿Las máquinas piensan por sí mismas o siguen patrones?", mat: "Videos explicativos.", eval: "Lista conceptual de IA.", prod: "Mapa mental sobre la IA." },
+                    { sem: "Semana 27-28", trim: "3.er Trimestre", dur: "Quincena", tema: "Entrenamiento de Modelos (Teachable Machine)", pda: "Entrena un modelo de aprendizaje visual con cámara web.", inicio: "Demostración de entrenamiento mostrando 30 fotos de objetos.", desarrollo: "Uso de Teachable Machine: entrenar modelo que reconozca 3 señas.", cierre: "Prueba del modelo en vivo y análisis de errores.", mat: "Teachable Machine (webcam).", eval: "Rúbrica de Machine Learning.", prod: "Modelo de IA probado en vivo." },
+                    { sem: "Semana 29-30", trim: "3.er Trimestre", dur: "Quincena", tema: "Modelos de Lenguaje y Prompts Éticos", pda: "Formula instrucciones precisas (prompts) con rol y contexto.", inicio: "¿Por qué si pides algo ambiguo a la IA te da respuestas falsas?", desarrollo: "Taller de prompts: pedir resúmenes con restricciones de palabras.", cierre: "Reflexión sobre 'alucinaciones' de la IA y verificación de datos.", mat: "Modelos de lenguaje edu.", eval: "Rúbrica de prompts y crítica.", prod: "Bitácora de prompts comparados." },
+                    { sem: "Semana 31-32", trim: "3.er Trimestre", dur: "Quincena", tema: "Ética, Sesgos y Uso Responsable", pda: "Analiza impacto social de la tecnología y honestidad académica.", inicio: "Debate: ¿Es correcto usar IA para hacer toda una tarea escolar?", desarrollo: "Análisis de dilemas éticos: sesgos de género/raza en IA y valor humano.", cierre: "Redacción de ensayo corto (1 página) sobre postura ética.", mat: "Procesador de textos.", eval: "Rúbrica de ensayo ético.", prod: "Ensayo sobre ética tecnológica." },
+                    { sem: "Semana 33-34", trim: "3.er Trimestre", dur: "Quincena", tema: "Programación Modular Avanzada", pda: "Crea simulaciones científicas interactivas con bloques propios.", inicio: "¿Cómo simular un fenómeno físico (ciclo del agua o gravedad)?", desarrollo: "Programación de simulación científica en Scratch con controles.", cierre: "Presentación de la simulación explicando el fenómeno.", mat: "Scratch 3.0 / MakeCode.", eval: "Rúbrica de simulaciones Scratch.", prod: "Simulación científica interactiva." },
+                    { sem: "Semana 35-36", trim: "3.er Trimestre", dur: "Quincena", tema: "Proyecto Final Integrador de Egreso", pda: "Desarrolla proyecto STEAM libre que demuestre dominio digital.", inicio: "Registro de proyectos (Sitio web, Videojuego o Campaña).", desarrollo: "Desarrollo intensivo del proyecto, asesorías y pruebas.", cierre: "Feria de Ciencias y Tecnología Escolar de egreso de 6.º.", mat: "Laboratorio completo.", eval: "Rúbrica de egreso digital.", prod: "Proyecto integrador defendido." },
+                    { sem: "Semana 37-38", trim: "3.er Trimestre", dur: "Quincena", tema: "Portafolio Digital de Egreso y Cierre", pda: "Compila proyectos de primaria en un portafolio web para secundaria.", inicio: "Organización de carpeta final con mejores trabajos de 1.º a 6.º.", desarrollo: "Evaluación global de salida y entrega de reconocimientos.", cierre: "Reflexión final sobre la trayectoria tecnológica en primaria.", mat: "Google Drive, Diplomas.", eval: "Evaluación global de egreso.", prod: "Portafolio Digital de Egreso." }
+                ]
+            }
+        };
+
+        let gradoActual = "1° Primaria";
+        let trimestreFiltro = "Todos";
+        let busquedaTexto = "";
+        let deferredPrompt = null;
+        let semanaEnEdicionId = null;
+        let semanaVisualizandoId = null;
+
+        function renderizarTabla() {
+            const tabla = document.getElementById("tablaCuerpo");
+            const datosGrado = baseDeDatos[gradoActual];
+            
+            document.getElementById("gradoTitle").textContent = `${gradoActual} — ${datosGrado.fase}`;
+            document.getElementById("gradoSubtitle").textContent = datosGrado.subtitulo;
+
+            let semanasFiltradas = datosGrado.semanas.filter(item => {
+                const cumpleTrimestre = (trimestreFiltro === "Todos") || (item.trim === trimestreFiltro);
+                const query = busquedaTexto.toLowerCase();
+                const cumpleBusqueda = (item.tema && item.tema.toLowerCase().includes(query)) ||
+                                       (item.pda && item.pda.toLowerCase().includes(query)) ||
+                                       (item.mat && item.mat.toLowerCase().includes(query)) ||
+                                       (item.sem && item.sem.toLowerCase().includes(query));
+                return cumpleTrimestre && cumpleBusqueda;
+            });
+
+            document.getElementById("statSemanas").textContent = "38";
+            document.getElementById("statUnidades").textContent = semanasFiltradas.length;
+
+            if (semanasFiltradas.length === 0) {
+                tabla.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center py-12 text-slate-400">
+                            <i class="fa-regular fa-folder-open text-3xl mb-2 block"></i>
+                            No se encontraron semanas que coincidan con los filtros aplicados.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tabla.innerHTML = semanasFiltradas.map((item) => `
+                <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100">
+                    <td class="py-3 px-4 font-bold text-center text-slate-900 bg-slate-50/50">${item.sem}<br><span class="text-[10px] font-normal text-slate-400">${item.dur}</span></td>
+                    <td class="py-3 px-4">
+                        <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                            item.trim === '1.er Trimestre' ? 'bg-blue-100 text-blue-700' :
+                            item.trim === '2.° Trimestre' ? 'bg-emerald-100 text-emerald-700' :
+                            'bg-purple-100 text-purple-700'
+                        }">
+                            ${item.trim}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 font-bold text-slate-800 leading-snug">${item.tema}</td>
+                    <td class="py-3 px-4 text-slate-600 leading-snug text-[11px]">${item.pda}</td>
+                    <td class="py-3 px-4 space-y-1 text-[11px]">
+                        <div><strong class="text-emerald-700">Inicio:</strong> ${item.inicio}</div>
+                        <div><strong class="text-amber-700">Desarrollo:</strong> ${item.desarrollo.substring(0, 55)}...</div>
+                    </td>
+                    <td class="py-3 px-4 text-slate-600 text-[11px]">${item.mat}</td>
+                    <td class="py-3 px-4">
+                        <div class="font-semibold text-slate-800 text-[11px]">${item.prod}</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">${item.eval}</div>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <div class="flex items-center justify-center gap-1.5">
+                            <button onclick="verDetalle('${item.sem}')" class="px-2.5 py-1.5 text-slate-700 hover:text-white hover:bg-slate-800 rounded-xl border border-slate-200 transition-all flex items-center justify-center gap-1 font-semibold text-xs shrink-0" title="Ver actividades completas">
+                                <i class="fa-solid fa-eye text-indigo-600"></i>
+                                <span class="hidden lg:inline">Ver</span>
+                            </button>
+                            <button onclick="abrirModal('${item.sem}')" class="px-2.5 py-1.5 text-blue-600 hover:text-white hover:bg-sepBlue rounded-xl border border-blue-200 transition-all flex items-center justify-center gap-1 font-semibold text-xs shrink-0" title="Editar actividades de la semana">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                                <span class="hidden lg:inline">Editar</span>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function verDetalle(semanaId) {
+            semanaVisualizandoId = semanaId;
+            const semanaData = baseDeDatos[gradoActual].semanas.find(s => s.sem === semanaId);
+            if (!semanaData) return;
+
+            document.getElementById("viewSemanaBadge").textContent = semanaData.sem;
+            document.getElementById("viewTrimestreBadge").textContent = semanaData.trim;
+            document.getElementById("viewGradoTitle").textContent = `${gradoActual} — ${baseDeDatos[gradoActual].fase}`;
+            document.getElementById("viewDuracion").textContent = semanaData.dur || "1 Semana";
+            document.getElementById("viewTema").textContent = semanaData.tema;
+            document.getElementById("viewPDA").textContent = semanaData.pda;
+            document.getElementById("viewInicio").textContent = semanaData.inicio;
+            document.getElementById("viewDesarrollo").textContent = semanaData.desarrollo;
+            document.getElementById("viewCierre").textContent = semanaData.cierre;
+            document.getElementById("viewMateriales").textContent = semanaData.mat;
+            document.getElementById("viewEvaluacion").textContent = semanaData.eval;
+            document.getElementById("viewProducto").textContent = semanaData.prod;
+
+            document.getElementById("btnSwitchToEdit").onclick = function() {
+                cerrarModalVer();
+                abrirModal(semanaId);
+            };
+
+            document.getElementById("modalVerDetalle").classList.remove("hidden");
+        }
+
+        function cerrarModalVer() {
+            document.getElementById("modalVerDetalle").classList.add("hidden");
+            semanaVisualizandoId = null;
+        }
+
+        function cambiarGrado(grado) {
+            gradoActual = grado;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = "tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all shrink-0 bg-slate-100 text-slate-600 hover:bg-slate-200";
+            });
+            const btnId = `tab-${grado.charAt(0)}`;
+            const activeBtn = document.getElementById(btnId);
+            if (activeBtn) {
+                activeBtn.className = "tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 bg-sepBlue text-white shadow-sm";
+            }
+            renderizarTabla();
+        }
+
+        function filtrarTrimestre(trim) {
+            trimestreFiltro = trim;
+            document.querySelectorAll('.trim-btn').forEach(btn => {
+                btn.className = "trim-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 shrink-0";
+            });
+            const mapId = { 'Todos': 'trim-Todos', '1.er Trimestre': 'trim-T1', '2.° Trimestre': 'trim-T2', '3.er Trimestre': 'trim-T3' };
+            const activeBtn = document.getElementById(mapId[trim]);
+            if (activeBtn) {
+                activeBtn.className = "trim-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-white shrink-0";
+            }
+            renderizarTabla();
+        }
+
+        function filtrarTabla() {
+            busquedaTexto = document.getElementById("searchInput").value;
+            renderizarTabla();
+        }
+
+        function abrirModal(semanaId) {
+            semanaEnEdicionId = semanaId;
+            const semanaData = baseDeDatos[gradoActual].semanas.find(s => s.sem === semanaId);
+            if (!semanaData) return;
+
+            document.getElementById("modalSemanaBadge").textContent = `${semanaData.sem} — ${gradoActual}`;
+            document.getElementById("editSemana").value = semanaData.sem;
+            document.getElementById("editDuracion").value = semanaData.dur || "1 Semana";
+            document.getElementById("editTrimestre").value = semanaData.trim;
+            document.getElementById("editTema").value = semanaData.tema;
+            document.getElementById("editPDA").value = semanaData.pda;
+            document.getElementById("editInicio").value = semanaData.inicio;
+            document.getElementById("editDesarrollo").value = semanaData.desarrollo;
+            document.getElementById("editCierre").value = semanaData.cierre;
+            document.getElementById("editMateriales").value = semanaData.mat;
+            document.getElementById("editEvaluacion").value = semanaData.eval;
+            document.getElementById("editProducto").value = semanaData.prod;
+
+            document.getElementById("modalDetalle").classList.remove("hidden");
+        }
+
+        function cerrarModal() {
+            document.getElementById("modalDetalle").classList.add("hidden");
+            semanaEnEdicionId = null;
+        }
+
+        function guardarCambiosSemana() {
+            if (!semanaEnEdicionId) return;
+
+            const semanasGrado = baseDeDatos[gradoActual].semanas;
+            const idx = semanasGrado.findIndex(s => s.sem === semanaEnEdicionId);
+            
+            if (idx !== -1) {
+                semanasGrado[idx].sem = document.getElementById("editSemana").value;
+                semanasGrado[idx].dur = document.getElementById("editDuracion").value;
+                semanasGrado[idx].trim = document.getElementById("editTrimestre").value;
+                semanasGrado[idx].tema = document.getElementById("editTema").value;
+                semanasGrado[idx].pda = document.getElementById("editPDA").value;
+                semanasGrado[idx].inicio = document.getElementById("editInicio").value;
+                semanasGrado[idx].desarrollo = document.getElementById("editDesarrollo").value;
+                semanasGrado[idx].cierre = document.getElementById("editCierre").value;
+                semanasGrado[idx].mat = document.getElementById("editMateriales").value;
+                semanasGrado[idx].eval = document.getElementById("editEvaluacion").value;
+                semanasGrado[idx].prod = document.getElementById("editProducto").value;
+
+                // Guardar cambios en el almacenamiento local del dispositivo
+                try {
+                    localStorage.setItem('planeaciones_computo_sep_custom_db', JSON.stringify(baseDeDatos));
+                    mostrarToast("¡Planeación modificada y guardada con éxito!");
+                } catch(e) {
+                    console.error("Error al guardar en almacenamiento local:", e);
+                }
+
+                renderizarTabla();
+                cerrarModal();
+            }
+        }
+
+        function restaurarValoresPorDefecto() {
+            if (confirm("¿Deseas restaurar todas las planeaciones a la versión original oficial de la SEP? Se eliminarán tus ediciones personalizadas.")) {
+                localStorage.removeItem('planeaciones_computo_sep_custom_db');
+                location.reload();
+            }
+        }
+
+        function cargarDatosGuardados() {
+            const customDb = localStorage.getItem('planeaciones_computo_sep_custom_db');
+            if (customDb) {
+                try {
+                    const parsed = JSON.parse(customDb);
+                    if (parsed && typeof parsed === 'object') {
+                        Object.keys(parsed).forEach(grado => {
+                            if (baseDeDatos[grado]) {
+                                baseDeDatos[grado] = parsed[grado];
+                            }
+                        });
+                    }
+                } catch(e) {
+                    console.error("Error al cargar la base de datos de localStorage:", e);
+                }
+            }
+        }
+
+        function mostrarToast(mensaje) {
+            const toast = document.getElementById("toastNotification");
+            const toastMsg = document.getElementById("toastMessage");
+            if (toast && toastMsg) {
+                toastMsg.textContent = mensaje;
+                toast.classList.remove("translate-y-20", "opacity-0");
+                toast.classList.add("translate-y-0", "opacity-100");
+                setTimeout(() => {
+                    toast.classList.remove("translate-y-0", "opacity-100");
+                    toast.classList.add("translate-y-20", "opacity-0");
+                }, 3000);
+            }
+        }
+
+        function cerrarModal() {
+            document.getElementById("modalDetalle").classList.add("hidden");
+        }
+
+        function exportarAExcel() {
+            const btn = document.getElementById("btnExportExcel");
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-sm"></i> <span>Generando Libro Excel...</span>`;
+            
+            setTimeout(() => {
+                try {
+                    const wb = XLSX.utils.book_new();
+
+                    const encabezados = [
+                        "Semana", "Trimestre", "Duración", "Tema / Contenido", 
+                        "Propósito / PDA", "Inicio (10 min)", "Desarrollo (35 min)", 
+                        "Cierre (10 min)", "Materiales y Software", "Evaluación", "Producto Entregable"
+                    ];
+
+                    Object.keys(baseDeDatos).forEach(nombreGrado => {
+                        const gradoInfo = baseDeDatos[nombreGrado];
+                        
+                        const filasMatriz = [
+                            [ `DOSIFICACIÓN Y PLANEACIÓN ANUAL DE COMPUTACIÓN — ${nombreGrado.toUpperCase()} (${gradoInfo.fase.toUpperCase()}) — SEP` ],
+                            encabezados
+                        ];
+
+                        gradoInfo.semanas.forEach(item => {
+                            filasMatriz.push([
+                                item.sem,
+                                item.trim,
+                                item.dur,
+                                item.tema,
+                                item.pda,
+                                item.inicio,
+                                item.desarrollo,
+                                item.cierre,
+                                item.mat,
+                                item.eval,
+                                item.prod
+                            ]);
+                        });
+
+                        const ws = XLSX.utils.aoa_to_sheet(filasMatriz);
+
+                        ws['!cols'] = [
+                            { wch: 14 },
+                            { wch: 15 },
+                            { wch: 12 },
+                            { wch: 28 },
+                            { wch: 32 },
+                            { wch: 35 },
+                            { wch: 45 },
+                            { wch: 30 },
+                            { wch: 25 },
+                            { wch: 25 },
+                            { wch: 28 }
+                        ];
+
+                        XLSX.utils.book_append_sheet(wb, ws, nombreGrado);
+                    });
+
+                    XLSX.writeFile(wb, "Planeacion_Anual_Computacion_Primaria_SEP.xlsx");
+
+                } catch (error) {
+                    console.error("Error al exportar Excel:", error);
+                } finally {
+                    btn.innerHTML = originalHTML;
+                }
+            }, 300);
+        }
+
+        // PWA Manifest Generation & Service Worker Dynamic Registration
+        function setupPWA() {
+            // 1. Create Web App Manifest dynamically
+            const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="%231B4F72"><rect width="512" height="512" rx="100" fill="%230f172a"/><path fill="%232980B9" d="M128 128h256v192H128z"/><path fill="%23ffffff" d="M96 352h320v32H96z"/><circle cx="256" cy="224" r="32" fill="%2322c55e"/></svg>`;
+            const iconUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgIcon);
+
+            const manifest = {
+                name: "Planeaciones Cómputo SEP",
+                short_name: "Cómputo SEP",
+                description: "Dosificación y Planeaciones Anuales de Cómputo Primaria - SEP",
+                start_url: "./",
+                display: "standalone",
+                background_color: "#0f172a",
+                theme_color: "#1B4F72",
+                icons: [
+                    { src: iconUrl, sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
+                    { src: iconUrl, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }
+                ]
+            };
+
+            const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+            const manifestURL = URL.createObjectURL(manifestBlob);
+            const linkManifest = document.createElement('link');
+            linkManifest.rel = 'manifest';
+            linkManifest.href = manifestURL;
+            document.head.appendChild(linkManifest);
+
+            // 2. Inline Service Worker code for full offline support
+            const serviceWorkerCode = `
+                const CACHE_NAME = 'computo-sep-v1';
+                const ASSETS = [
+                    './',
+                    'https://cdn.tailwindcss.com',
+                    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+                    'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
+                ];
+
+                self.addEventListener('install', (e) => {
+                    e.waitUntil(
+                        caches.open(CACHE_NAME).then((cache) => {
+                            return cache.addAll(ASSETS).catch(() => Promise.resolve());
+                        })
+                    );
+                    self.skipWaiting();
+                });
+
+                self.addEventListener('activate', (e) => {
+                    e.waitUntil(
+                        caches.keys().then((keys) => {
+                            return Promise.all(
+                                keys.map((key) => {
+                                    if (key !== CACHE_NAME) return caches.delete(key);
+                                })
+                            );
+                        })
+                    );
+                    self.clients.claim();
+                });
+
+                self.addEventListener('fetch', (e) => {
+                    e.respondWith(
+                        caches.match(e.request).then((cachedResponse) => {
+                            if (cachedResponse) return cachedResponse;
+                            return fetch(e.request).then((networkResponse) => {
+                                if (e.request.method === 'GET' && networkResponse.status === 200) {
+                                    const responseClone = networkResponse.clone();
+                                    caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseClone));
+                                }
+                                return networkResponse;
+                            }).catch(() => cachedResponse);
+                        })
+                    );
+                });
+            `;
+
+            // Register SW via Blob URL
+            if ('serviceWorker' in navigator) {
+                const swBlob = new Blob([serviceWorkerCode], { type: 'application/javascript' });
+                const swURL = URL.createObjectURL(swBlob);
+                navigator.serviceWorker.register(swURL)
+                    .then(() => console.log("PWA Service Worker registrado correctamente."))
+                    .catch((err) => console.log("SW Registro:", err));
+            }
+
+            // 3. PWA Installation Event Handling
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                const btnInstall = document.getElementById('btnInstallPwa');
+                if (btnInstall) {
+                    btnInstall.classList.remove('hidden');
+                    btnInstall.classList.add('flex');
+                }
+            });
+
+            window.addEventListener('appinstalled', () => {
+                deferredPrompt = null;
+                const btnInstall = document.getElementById('btnInstallPwa');
+                if (btnInstall) {
+                    btnInstall.classList.add('hidden');
+                }
+                const pwaBadge = document.getElementById('pwaBadge');
+                if (pwaBadge) {
+                    pwaBadge.innerHTML = `<i class="fa-solid fa-check-circle text-emerald-400"></i> App Instalada`;
+                }
+            });
+
+            // 4. Network Status Monitoring
+            function updateOnlineStatus() {
+                const networkText = document.getElementById('networkText');
+                const networkIcon = document.getElementById('networkIcon');
+                if (navigator.onLine) {
+                    if (networkText) networkText.textContent = 'Online';
+                    if (networkIcon) networkIcon.className = 'fa-solid fa-wifi text-emerald-400 text-[10px]';
+                } else {
+                    if (networkText) networkText.textContent = 'Modo Offline';
+                    if (networkIcon) networkIcon.className = 'fa-solid fa-plane text-amber-400 text-[10px]';
+                }
+            }
+
+            window.addEventListener('online', updateOnlineStatus);
+            window.addEventListener('offline', updateOnlineStatus);
+            updateOnlineStatus();
+        }
+
+        function instalarPWA() {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('El usuario aceptó instalar la PWA');
+                }
+                deferredPrompt = null;
+                const btnInstall = document.getElementById('btnInstallPwa');
+                if (btnInstall) {
+                    btnInstall.classList.add('hidden');
+                }
+            });
+        }
+
+        // Initialize view & PWA setup on load
+        window.onload = function() {
+            cargarDatosGuardados();
+            renderizarTabla();
+            setupPWA();
+        };
+    </script>
+
+<!-- ACTIVATION OVERLAY -->
+<div id="activation-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-95 z-[9999] flex flex-col items-center justify-center hidden">
+    <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full text-center">
+        <h2 class="text-2xl font-bold text-sepBlue mb-4">Activación Requerida</h2>
+        
+        <div id="trial-status" class="mb-6 text-gray-700">
+            <p>Días restantes de prueba: <span id="days-remaining" class="font-bold text-sepAccent">3</span></p>
+            <p class="text-sm text-gray-500 mt-2">Tu ID de equipo:</p>
+            <div class="flex items-center gap-2 mt-1">
+                <div class="bg-gray-100 p-2 rounded text-xs font-mono flex-1 select-all break-all" id="machine-id">CARGANDO...</div>
+                <button id="btn-copy-id" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded transition" title="Copiar ID"><i class="fa-solid fa-copy"></i></button>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-left text-sm font-medium text-gray-700 mb-1">Código de Activación:</label>
+            <input type="text" id="activation-key" class="w-full border-gray-300 rounded-md shadow-sm focus:border-sepBlue focus:ring focus:ring-sepBlue focus:ring-opacity-50 p-2 border" placeholder="Escribe tu código aquí">
+            <p id="activation-error" class="text-red-500 text-sm mt-2 hidden">Código inválido.</p>
+        </div>
+
+        <div class="flex flex-col gap-3">
+            <button id="btn-activate" class="w-full bg-sepGreen text-white px-4 py-2 rounded font-semibold hover:bg-green-700 transition">Activar</button>
+            <button id="btn-continue-trial" class="w-full bg-sepBlue text-white px-4 py-2 rounded font-semibold hover:bg-blue-800 transition hidden">Continuar Prueba</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        if (!window.licenseAPI) return; // Not in Electron
+
+        const licenseInfo = await window.licenseAPI.getLicenseInfo();
+        const overlay = document.getElementById('activation-overlay');
+        const daysRemainingSpan = document.getElementById('days-remaining');
+        const machineIdSpan = document.getElementById('machine-id');
+        const btnContinue = document.getElementById('btn-continue-trial');
+
+        if (!licenseInfo.isActivated) {
+            overlay.classList.remove('hidden');
+            daysRemainingSpan.textContent = licenseInfo.daysRemaining;
+            machineIdSpan.textContent = licenseInfo.machineId;
+
+            if (licenseInfo.daysRemaining > 0) {
+                btnContinue.classList.remove('hidden');
+            } else {
+                daysRemainingSpan.classList.add('text-red-600');
+            }
+        }
+
+        btnContinue.addEventListener('click', () => {
+            overlay.classList.add('hidden');
+        });
+
+        document.getElementById('btn-copy-id').addEventListener('click', () => {
+            navigator.clipboard.writeText(machineIdSpan.textContent);
+            alert('ID de equipo copiado al portapapeles');
+        });
+
+        document.getElementById('btn-activate').addEventListener('click', async () => {
+            const key = document.getElementById('activation-key').value.trim().toUpperCase();
+            const result = await window.licenseAPI.activateLicense(key);
+            if (result.success) {
+                alert('¡Activación exitosa! Gracias por tu compra.');
+                overlay.classList.add('hidden');
+            } else {
+                const err = document.getElementById('activation-error');
+                err.textContent = result.message;
+                err.classList.remove('hidden');
+            }
+        });
+    });
+</script>
+
+</body>
+</html>
