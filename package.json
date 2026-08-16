@@ -27,12 +27,14 @@
       "createStartMenuShortcut": true
     },
     "mac": {
-      "target": {
-        "target": "dmg",
-        "arch": [
-          "universal"
-        ]
-      },
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
       "identity": null
     }
   },
